@@ -1,0 +1,16 @@
+{
+  "_meta": {
+    "recorded_at": "2026-04-05T00:00:00Z",
+    "library_version": "placeholder",
+    "api_method": "user",
+    "args": ["user-001"],
+    "cloud": true
+  },
+  "accountId": "user-001",
+  "displayName": "Test User 1",
+  "emailAddress": "user1@example.com",
+  "active": true,
+  "self": "https://test.atlassian.net/rest/api/2/user?accountId=user-001",
+  "accountType": "atlassian",
+  "timeZone": "UTC"
+}

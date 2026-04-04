@@ -1,0 +1,44 @@
+{
+  "_meta": {
+    "recorded_at": "2026-04-05T00:00:00Z",
+    "library_version": "placeholder",
+    "api_method": "projects",
+    "args": [],
+    "cloud": true
+  },
+  "items": [
+    {
+      "key": "TEST",
+      "name": "Test Project",
+      "self": "https://test.atlassian.net/rest/api/2/project/10000",
+      "id": 10000,
+      "lead": {
+        "displayName": "Test User 1",
+        "accountId": "user-001"
+      },
+      "projectTypeKey": "software"
+    },
+    {
+      "key": "DEV",
+      "name": "Development",
+      "self": "https://test.atlassian.net/rest/api/2/project/10001",
+      "id": 10001,
+      "lead": {
+        "displayName": "Test User 2",
+        "accountId": "user-002"
+      },
+      "projectTypeKey": "software"
+    },
+    {
+      "key": "OPS",
+      "name": "Operations",
+      "self": "https://test.atlassian.net/rest/api/2/project/10002",
+      "id": 10002,
+      "lead": {
+        "displayName": "Test User 3",
+        "accountId": "user-003"
+      },
+      "projectTypeKey": "service_desk"
+    }
+  ]
+}

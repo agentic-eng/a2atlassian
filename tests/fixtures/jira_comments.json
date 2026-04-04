@@ -1,0 +1,79 @@
+{
+  "_meta": {
+    "recorded_at": "2026-04-05T00:00:00Z",
+    "library_version": "placeholder",
+    "api_method": "issue_get_comments",
+    "args": ["TEST-1"],
+    "cloud": true
+  },
+  "comments": [
+    {
+      "id": "10100",
+      "author": {
+        "displayName": "Test User 1",
+        "accountId": "user-001"
+      },
+      "updateAuthor": {
+        "displayName": "Test User 1",
+        "accountId": "user-001"
+      },
+      "body": "This is a plain text comment on the issue.",
+      "created": "2026-01-01T12:00:00.000+0000",
+      "updated": "2026-01-01T12:00:00.000+0000"
+    },
+    {
+      "id": "10101",
+      "author": {
+        "displayName": "Test User 2",
+        "accountId": "user-002"
+      },
+      "updateAuthor": {
+        "displayName": "Test User 2",
+        "accountId": "user-002"
+      },
+      "body": {
+        "type": "doc",
+        "version": 1,
+        "content": [
+          {
+            "type": "paragraph",
+            "content": [
+              {
+                "type": "text",
+                "text": "This is an ADF comment body with "
+              },
+              {
+                "type": "text",
+                "text": "rich formatting",
+                "marks": [{"type": "strong"}]
+              },
+              {
+                "type": "text",
+                "text": "."
+              }
+            ]
+          }
+        ]
+      },
+      "created": "2026-01-02T09:00:00.000+0000",
+      "updated": "2026-01-02T09:30:00.000+0000"
+    },
+    {
+      "id": "10102",
+      "author": {
+        "displayName": "Test User 3",
+        "accountId": "user-003"
+      },
+      "updateAuthor": {
+        "displayName": "Test User 3",
+        "accountId": "user-003"
+      },
+      "body": "Looks good to me, merging now.",
+      "created": "2026-01-03T14:00:00.000+0000",
+      "updated": "2026-01-03T14:00:00.000+0000"
+    }
+  ],
+  "total": 3,
+  "startAt": 0,
+  "maxResults": 50
+}
