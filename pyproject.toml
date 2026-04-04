@@ -72,6 +72,9 @@ max-returns = 6
 testpaths = ["tests"]
 addopts = "-v --strict-markers --cov --cov-report=term:skip-covered --cov-report=xml --cov-fail-under=90"
 asyncio_mode = "auto"
+markers = [
+    "integration: marks tests that hit a real Jira instance (use --integration to run)",
+]
 env = [
     "A2ATLASSIAN_TEST=1",
 ]
