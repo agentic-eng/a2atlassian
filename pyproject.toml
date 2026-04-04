@@ -67,6 +67,7 @@ max-returns = 6
 ]
 "src/a2atlassian/jira_read_tools.py" = ["C901", "PLR0915"]
 "src/a2atlassian/jira_write_tools.py" = ["C901", "PLR0915"]
+"scripts/**" = ["T201", "BLE001", "C901", "PLR0912", "PLR0915"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

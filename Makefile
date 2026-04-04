@@ -1,4 +1,4 @@
-.PHONY: lint fix test check coverage-diff security-audit bootstrap
+.PHONY: lint fix test check coverage-diff security-audit bootstrap test-fixtures test-integration record-fixtures
 
 lint:
 	agent-harness lint
@@ -16,6 +16,15 @@ security-audit:
 	agent-harness security-audit
 
 check: lint test coverage-diff security-audit
+
+test-fixtures:
+	uv run pytest tests/fixture_tests/ -v --no-cov
+
+test-integration:
+	uv run pytest tests/integration/ -v --no-cov --integration
+
+record-fixtures:
+	uv run python scripts/record_fixtures.py
 
 bootstrap: ## First-time setup after clone
 	uv sync

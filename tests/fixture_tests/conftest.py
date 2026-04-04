@@ -23,13 +23,14 @@ def _load_fixture(name: str):
 def _check_fixture_freshness():
     """Warn if fixtures were recorded with a different library version."""
     try:
-        import atlassian
+        from importlib.metadata import version
 
         meta = json.loads((FIXTURES / "jira_issue.json").read_text()).get("_meta", {})
         recorded = meta.get("library_version", "unknown")
-        if atlassian.__version__ != recorded:
+        current = version("atlassian-python-api")
+        if current != recorded:
             warnings.warn(
-                f"Fixtures recorded with {recorded}, running {atlassian.__version__}",
+                f"Fixtures recorded with {recorded}, running {current}",
                 stacklevel=2,
             )
     except ImportError:
