@@ -1,4 +1,4 @@
-"""MCP server frontend — tool registrations for Jira operations."""
+"""MCP server frontend — server setup, connection management, and tool registration."""
 
 from __future__ import annotations
 
@@ -10,10 +10,8 @@ from a2atlassian.client import AtlassianClient
 from a2atlassian.config import DEFAULT_CONFIG_DIR
 from a2atlassian.connections import ConnectionInfo, ConnectionStore
 from a2atlassian.errors import ErrorEnricher
-from a2atlassian.formatter import format_result
-from a2atlassian.jira.comments import add_comment, edit_comment, get_comments
-from a2atlassian.jira.issues import get_issue, search
-from a2atlassian.jira.transitions import get_transitions, transition_issue
+from a2atlassian.jira_read_tools import register_jira_read_tools
+from a2atlassian.jira_write_tools import register_jira_write_tools
 
 server = FastMCP(
     "a2atlassian",
@@ -99,96 +97,10 @@ def list_connections(project: str | None = None) -> str:
     return "\n".join(lines)
 
 
-# --- Jira read tools ---
+# --- Register Jira tools ---
 
-
-@server.tool()
-async def jira_get_issue(project: str, issue_key: str, format: str = "json") -> str:  # noqa: A002
-    """Get a Jira issue by key. Returns full issue data including fields and status."""
-    client = _get_client(project)
-    try:
-        result = await get_issue(client, issue_key)
-    except Exception as exc:  # noqa: BLE001
-        return _enricher.enrich(str(exc), {"project": project})
-    return format_result(result, fmt=format)
-
-
-@server.tool()
-async def jira_search(project: str, jql: str, limit: int = 50, offset: int = 0, format: str = "toon") -> str:  # noqa: A002
-    """Search Jira issues using JQL. Returns list of matching issues."""
-    client = _get_client(project)
-    try:
-        result = await search(client, jql, limit=limit, offset=offset)
-    except Exception as exc:  # noqa: BLE001
-        return _enricher.enrich(str(exc), {"project": project})
-    return format_result(result, fmt=format)
-
-
-@server.tool()
-async def jira_get_comments(project: str, issue_key: str, format: str = "toon") -> str:  # noqa: A002
-    """Get all comments for a Jira issue."""
-    client = _get_client(project)
-    try:
-        result = await get_comments(client, issue_key)
-    except Exception as exc:  # noqa: BLE001
-        return _enricher.enrich(str(exc), {"project": project})
-    return format_result(result, fmt=format)
-
-
-@server.tool()
-async def jira_get_transitions(project: str, issue_key: str, format: str = "toon") -> str:  # noqa: A002
-    """Get available transitions for a Jira issue."""
-    client = _get_client(project)
-    try:
-        result = await get_transitions(client, issue_key)
-    except Exception as exc:  # noqa: BLE001
-        return _enricher.enrich(str(exc), {"project": project})
-    return format_result(result, fmt=format)
-
-
-# --- Jira write tools ---
-
-
-@server.tool()
-async def jira_add_comment(project: str, issue_key: str, body: str, format: str = "json") -> str:  # noqa: A002
-    """Add a comment to a Jira issue. Uses wiki markup (API v2)."""
-    conn = _get_connection(project)
-    if conn.read_only:
-        return _enricher.enrich(f"Connection '{project}' is read-only.", {"project": project})
-    client = AtlassianClient(conn)
-    try:
-        result = await add_comment(client, issue_key, body)
-    except Exception as exc:  # noqa: BLE001
-        return _enricher.enrich(str(exc), {"project": project})
-    return format_result(result, fmt=format)
-
-
-@server.tool()
-async def jira_edit_comment(project: str, issue_key: str, comment_id: str, body: str, format: str = "json") -> str:  # noqa: A002
-    """Edit an existing comment on a Jira issue. Uses wiki markup (API v2)."""
-    conn = _get_connection(project)
-    if conn.read_only:
-        return _enricher.enrich(f"Connection '{project}' is read-only.", {"project": project})
-    client = AtlassianClient(conn)
-    try:
-        result = await edit_comment(client, issue_key, comment_id, body)
-    except Exception as exc:  # noqa: BLE001
-        return _enricher.enrich(str(exc), {"project": project})
-    return format_result(result, fmt=format)
-
-
-@server.tool()
-async def jira_transition_issue(project: str, issue_key: str, transition_id: str, format: str = "json") -> str:  # noqa: A002
-    """Transition a Jira issue to a new status. Use jira_get_transitions to discover available transitions."""
-    conn = _get_connection(project)
-    if conn.read_only:
-        return _enricher.enrich(f"Connection '{project}' is read-only.", {"project": project})
-    client = AtlassianClient(conn)
-    try:
-        result = await transition_issue(client, issue_key, transition_id)
-    except Exception as exc:  # noqa: BLE001
-        return _enricher.enrich(str(exc), {"project": project})
-    return format_result(result, fmt=format)
+register_jira_read_tools(server, _get_client, _enricher)
+register_jira_write_tools(server, _get_connection, _enricher)
 
 
 # --- CLI argument parsing ---

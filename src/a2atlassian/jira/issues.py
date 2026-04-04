@@ -105,3 +105,80 @@ async def search(
         truncated=truncated,
         time_ms=elapsed,
     )
+
+
+async def create_issue(
+    client: AtlassianClient,
+    project_key: str,
+    summary: str,
+    issue_type: str,
+    description: str | None = None,
+    extra_fields: dict[str, Any] | None = None,
+) -> OperationResult:
+    """Create a new Jira issue."""
+    fields: dict[str, Any] = {
+        "project": {"key": project_key},
+        "summary": summary,
+        "issuetype": {"name": issue_type},
+    }
+    if description:
+        fields["description"] = description
+    if extra_fields:
+        fields.update(extra_fields)
+
+    t0 = time.monotonic()
+    data = await client._call(client._jira.create_issue, fields=fields)
+    elapsed = int((time.monotonic() - t0) * 1000)
+
+    # atlassian-python-api may return a dict with key/id or a full issue
+    result_data: dict[str, Any] = {
+        "key": data.get("key", ""),
+        "id": str(data.get("id", "")),
+        "self": data.get("self", ""),
+        "status": "created",
+    }
+
+    return OperationResult(
+        name="create_issue",
+        data=result_data,
+        count=1,
+        truncated=False,
+        time_ms=elapsed,
+    )
+
+
+async def update_issue(
+    client: AtlassianClient,
+    issue_key: str,
+    fields: dict[str, Any],
+) -> OperationResult:
+    """Update fields on an existing Jira issue."""
+    t0 = time.monotonic()
+    await client._call(client._jira.update_issue_field, issue_key, fields)
+    elapsed = int((time.monotonic() - t0) * 1000)
+
+    return OperationResult(
+        name="update_issue",
+        data={"issue_key": issue_key, "status": "updated"},
+        count=1,
+        truncated=False,
+        time_ms=elapsed,
+    )
+
+
+async def delete_issue(
+    client: AtlassianClient,
+    issue_key: str,
+) -> OperationResult:
+    """Delete a Jira issue."""
+    t0 = time.monotonic()
+    await client._call(client._jira.delete_issue, issue_key)
+    elapsed = int((time.monotonic() - t0) * 1000)
+
+    return OperationResult(
+        name="delete_issue",
+        data={"issue_key": issue_key, "status": "deleted"},
+        count=1,
+        truncated=False,
+        time_ms=elapsed,
+    )

@@ -2,9 +2,8 @@
 # Detected stacks: python
 stacks: [python]
 
-# exclude:
-#   - _archive/
-#   - vendor/
+exclude:
+  - src/a2atlassian/mcp_server.py  # tool registry file, grows with each tool
 
 # python:
 #   coverage_threshold: 95

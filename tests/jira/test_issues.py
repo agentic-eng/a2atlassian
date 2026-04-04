@@ -9,7 +9,7 @@ import pytest
 from a2atlassian.client import AtlassianClient
 from a2atlassian.connections import ConnectionInfo
 from a2atlassian.formatter import OperationResult
-from a2atlassian.jira.issues import get_issue, search
+from a2atlassian.jira.issues import create_issue, delete_issue, get_issue, search, update_issue
 
 
 @pytest.fixture
@@ -103,3 +103,75 @@ class TestSearch:
         mock_client._jira_instance.jql.return_value = {"issues": [], "total": 0}
         await search(mock_client, "project = PROJ", limit=25, offset=10)
         mock_client._jira_instance.jql.assert_called_once_with("project = PROJ", limit=25, start=10)
+
+
+class TestCreateIssue:
+    async def test_creates_issue(self, mock_client: AtlassianClient) -> None:
+        mock_client._jira_instance.create_issue.return_value = {
+            "id": "10001",
+            "key": "PROJ-42",
+            "self": "https://test.atlassian.net/rest/api/2/issue/10001",
+        }
+        result = await create_issue(mock_client, "PROJ", "New task", "Story")
+        assert isinstance(result, OperationResult)
+        assert result.data["key"] == "PROJ-42"
+        assert result.data["id"] == "10001"
+        assert result.data["status"] == "created"
+        assert result.count == 1
+        mock_client._jira_instance.create_issue.assert_called_once_with(
+            fields={
+                "project": {"key": "PROJ"},
+                "summary": "New task",
+                "issuetype": {"name": "Story"},
+            }
+        )
+
+    async def test_creates_issue_with_description(self, mock_client: AtlassianClient) -> None:
+        mock_client._jira_instance.create_issue.return_value = {
+            "id": "10002",
+            "key": "PROJ-43",
+        }
+        result = await create_issue(mock_client, "PROJ", "With desc", "Bug", description="Details here")
+        assert result.data["key"] == "PROJ-43"
+        call_fields = mock_client._jira_instance.create_issue.call_args[1]["fields"]
+        assert call_fields["description"] == "Details here"
+
+    async def test_creates_issue_with_extra_fields(self, mock_client: AtlassianClient) -> None:
+        mock_client._jira_instance.create_issue.return_value = {
+            "id": "10003",
+            "key": "PROJ-44",
+        }
+        extra = {"priority": {"name": "High"}, "labels": ["urgent"]}
+        result = await create_issue(mock_client, "PROJ", "Extra", "Task", extra_fields=extra)
+        assert result.data["key"] == "PROJ-44"
+        call_fields = mock_client._jira_instance.create_issue.call_args[1]["fields"]
+        assert call_fields["priority"] == {"name": "High"}
+        assert call_fields["labels"] == ["urgent"]
+
+    async def test_handles_int_id(self, mock_client: AtlassianClient) -> None:
+        mock_client._jira_instance.create_issue.return_value = {
+            "id": 10004,
+            "key": "PROJ-45",
+        }
+        result = await create_issue(mock_client, "PROJ", "Int ID", "Task")
+        assert result.data["id"] == "10004"
+
+
+class TestUpdateIssue:
+    async def test_updates_issue(self, mock_client: AtlassianClient) -> None:
+        mock_client._jira_instance.update_issue_field.return_value = None
+        result = await update_issue(mock_client, "PROJ-1", {"summary": "Updated"})
+        assert isinstance(result, OperationResult)
+        assert result.data["issue_key"] == "PROJ-1"
+        assert result.data["status"] == "updated"
+        mock_client._jira_instance.update_issue_field.assert_called_once_with("PROJ-1", {"summary": "Updated"})
+
+
+class TestDeleteIssue:
+    async def test_deletes_issue(self, mock_client: AtlassianClient) -> None:
+        mock_client._jira_instance.delete_issue.return_value = None
+        result = await delete_issue(mock_client, "PROJ-1")
+        assert isinstance(result, OperationResult)
+        assert result.data["issue_key"] == "PROJ-1"
+        assert result.data["status"] == "deleted"
+        mock_client._jira_instance.delete_issue.assert_called_once_with("PROJ-1")

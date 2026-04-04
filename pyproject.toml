@@ -65,6 +65,8 @@ max-returns = 6
     "S101", "S105", "S106", "E402", "ARG001", "PLR2004",
     "SLF001", "PT011", "PLR0915", "PLC0415",
 ]
+"src/a2atlassian/jira_read_tools.py" = ["C901", "PLR0915"]
+"src/a2atlassian/jira_write_tools.py" = ["C901", "PLR0915"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -77,7 +79,7 @@ env = [
 [tool.coverage.run]
 source = ["src/a2atlassian"]
 branch = true
-omit = ["src/a2atlassian/cli.py", "src/a2atlassian/mcp_server.py"]
+omit = ["src/a2atlassian/cli.py", "src/a2atlassian/mcp_server.py", "src/a2atlassian/jira_read_tools.py", "src/a2atlassian/jira_write_tools.py"]
 
 [tool.coverage.report]
 show_missing = false
