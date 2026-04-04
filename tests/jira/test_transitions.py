@@ -27,16 +27,31 @@ def mock_client() -> AtlassianClient:
 
 
 class TestGetTransitions:
-    async def test_returns_transitions(self, mock_client: AtlassianClient) -> None:
+    async def test_returns_transitions_dict_to(self, mock_client: AtlassianClient) -> None:
+        """REST API returns 'to' as a dict with a 'name' key."""
         mock_client._jira_instance.get_issue_transitions.return_value = [
-            {"id": "11", "name": "To Do"},
-            {"id": "21", "name": "In Progress"},
-            {"id": "31", "name": "Done"},
+            {"id": "11", "name": "To Do", "to": {"name": "To Do"}},
+            {"id": "21", "name": "In Progress", "to": {"name": "In Progress"}},
+            {"id": "31", "name": "Done", "to": {"name": "Done"}},
         ]
         result = await get_transitions(mock_client, "PROJ-1")
         assert isinstance(result, OperationResult)
         assert len(result.data) == 3
         assert result.data[0]["name"] == "To Do"
+        assert result.data[0]["to_status"] == "To Do"
+        assert result.data[0]["id"] == "11"
+
+    async def test_returns_transitions_string_to(self, mock_client: AtlassianClient) -> None:
+        """atlassian-python-api returns 'to' as a plain string."""
+        mock_client._jira_instance.get_issue_transitions.return_value = [
+            {"id": 11, "name": "To Do", "to": "To Do"},
+            {"id": 21, "name": "In Progress", "to": "In Progress"},
+            {"id": 31, "name": "Done", "to": "Done"},
+        ]
+        result = await get_transitions(mock_client, "PROJ-1")
+        assert len(result.data) == 3
+        assert result.data[0]["to_status"] == "To Do"
+        assert result.data[0]["id"] == "11"
 
 
 class TestTransitionIssue:

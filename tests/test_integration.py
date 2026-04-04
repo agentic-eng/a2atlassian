@@ -43,6 +43,8 @@ class TestFullWorkflow:
         }
         issue = await get_issue(mock_jira_client, "PROJ-42")
         assert issue.data["key"] == "PROJ-42"
+        assert issue.data["summary"] == "Implement auth"
+        assert issue.data["status"] == "To Do"
 
         # 2. Get comments
         jira.issue_get_comments.return_value = {"comments": [], "total": 0}
@@ -50,22 +52,23 @@ class TestFullWorkflow:
         assert comments.count == 0
 
         # 3. Add comment
-        jira.issue_add_comment.return_value = {"id": "100", "body": "Starting work"}
+        jira.issue_add_comment.return_value = {"id": "100", "body": "Starting work", "author": {"displayName": "Test"}}
         new_comment = await add_comment(mock_jira_client, "PROJ-42", "Starting work")
         assert new_comment.data["id"] == "100"
 
         # 4. Edit comment (progress update)
-        jira.issue_edit_comment.return_value = {"id": "100", "body": "50% done"}
+        jira.issue_edit_comment.return_value = {"id": "100", "body": "50% done", "author": {"displayName": "Test"}}
         updated = await edit_comment(mock_jira_client, "PROJ-42", "100", "50% done")
         assert updated.data["body"] == "50% done"
 
         # 5. Get transitions
         jira.get_issue_transitions.return_value = [
-            {"id": "21", "name": "In Progress"},
-            {"id": "31", "name": "Done"},
+            {"id": "21", "name": "In Progress", "to": {"name": "In Progress"}},
+            {"id": "31", "name": "Done", "to": {"name": "Done"}},
         ]
         transitions = await get_transitions(mock_jira_client, "PROJ-42")
         assert len(transitions.data) == 2
+        assert transitions.data[0]["to_status"] == "In Progress"
 
         # 6. Transition
         jira.issue_transition.return_value = None
@@ -77,8 +80,8 @@ class TestFormatting:
     async def test_search_toon_format(self, mock_jira_client: AtlassianClient) -> None:
         mock_jira_client._jira_instance.jql.return_value = {
             "issues": [
-                {"key": "PROJ-1", "fields": {"summary": "First"}},
-                {"key": "PROJ-2", "fields": {"summary": "Second"}},
+                {"key": "PROJ-1", "fields": {"summary": "First", "status": {"name": "Open"}}},
+                {"key": "PROJ-2", "fields": {"summary": "Second", "status": {"name": "Done"}}},
             ],
             "total": 2,
         }
@@ -86,6 +89,9 @@ class TestFormatting:
         output = format_result(result, fmt="toon")
         assert "PROJ-1" in output
         assert "PROJ-2" in output
+        assert "key\t" in output  # header row has extracted field names
+        assert "First" in output
+        assert "Open" in output
 
     async def test_get_issue_json_format(self, mock_jira_client: AtlassianClient) -> None:
         mock_jira_client._jira_instance.issue.return_value = {

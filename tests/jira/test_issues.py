@@ -32,13 +32,22 @@ class TestGetIssue:
             "key": "PROJ-1",
             "fields": {
                 "summary": "Test issue",
-                "status": {"name": "In Progress"},
+                "status": {"name": "In Progress", "statusCategory": {"name": "In Progress"}},
                 "assignee": {"displayName": "Alice"},
+                "reporter": {"displayName": "Bob"},
+                "priority": {"name": "High"},
+                "issuetype": {"name": "Story"},
             },
         }
         result = await get_issue(mock_client, "PROJ-1")
         assert isinstance(result, OperationResult)
         assert result.data["key"] == "PROJ-1"
+        assert result.data["summary"] == "Test issue"
+        assert result.data["status"] == "In Progress"
+        assert result.data["assignee"] == "Alice"
+        assert result.data["reporter"] == "Bob"
+        assert result.data["priority"] == "High"
+        assert result.data["type"] == "Story"
         assert result.count == 1
         assert result.truncated is False
         assert result.time_ms >= 0
@@ -48,13 +57,28 @@ class TestGetIssue:
         await get_issue(mock_client, "PROJ-1")
         mock_client._jira_instance.issue.assert_called_once_with("PROJ-1")
 
+    async def test_handles_null_fields(self, mock_client: AtlassianClient) -> None:
+        mock_client._jira_instance.issue.return_value = {
+            "key": "PROJ-1",
+            "fields": {
+                "summary": "Test",
+                "status": None,
+                "assignee": None,
+                "priority": None,
+                "issuetype": None,
+            },
+        }
+        result = await get_issue(mock_client, "PROJ-1")
+        assert result.data["status"] == ""
+        assert result.data["assignee"] == ""
+
 
 class TestSearch:
     async def test_returns_list_result(self, mock_client: AtlassianClient) -> None:
         mock_client._jira_instance.jql.return_value = {
             "issues": [
-                {"key": "PROJ-1", "fields": {"summary": "First"}},
-                {"key": "PROJ-2", "fields": {"summary": "Second"}},
+                {"key": "PROJ-1", "fields": {"summary": "First", "status": {"name": "Open"}}},
+                {"key": "PROJ-2", "fields": {"summary": "Second", "status": {"name": "Done"}}},
             ],
             "total": 2,
         }
@@ -62,6 +86,9 @@ class TestSearch:
         assert isinstance(result, OperationResult)
         assert len(result.data) == 2
         assert result.count == 2
+        assert result.data[0]["key"] == "PROJ-1"
+        assert result.data[0]["summary"] == "First"
+        assert result.data[0]["status"] == "Open"
 
     async def test_truncation_flag(self, mock_client: AtlassianClient) -> None:
         issues = [{"key": f"PROJ-{i}", "fields": {"summary": f"Issue {i}"}} for i in range(50)]

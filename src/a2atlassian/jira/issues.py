@@ -3,12 +3,64 @@
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from a2atlassian.formatter import OperationResult
 
 if TYPE_CHECKING:
     from a2atlassian.client import AtlassianClient
+
+
+def _extract_issue_summary(raw: dict[str, Any]) -> dict[str, Any]:
+    """Extract key fields from a raw issue for list display."""
+    fields = raw.get("fields", {})
+    status = fields.get("status") or {}
+    assignee = fields.get("assignee") or {}
+    priority = fields.get("priority") or {}
+    issuetype = fields.get("issuetype") or {}
+    parent = fields.get("parent") or {}
+    return {
+        "key": raw.get("key", ""),
+        "summary": fields.get("summary", ""),
+        "status": status.get("name", ""),
+        "assignee": assignee.get("displayName", ""),
+        "priority": priority.get("name", ""),
+        "type": issuetype.get("name", ""),
+        "parent": parent.get("key", ""),
+        "updated": fields.get("updated", ""),
+    }
+
+
+def _extract_issue_detail(raw: dict[str, Any]) -> dict[str, Any]:
+    """Extract fields from a raw issue for single-entity display."""
+    fields = raw.get("fields", {})
+    status = fields.get("status") or {}
+    status_cat = status.get("statusCategory") or {}
+    assignee = fields.get("assignee") or {}
+    reporter = fields.get("reporter") or {}
+    priority = fields.get("priority") or {}
+    issuetype = fields.get("issuetype") or {}
+    parent = fields.get("parent") or {}
+    labels = fields.get("labels") or []
+    components = fields.get("components") or []
+    fix_versions = fields.get("fixVersions") or []
+    return {
+        "key": raw.get("key", ""),
+        "summary": fields.get("summary", ""),
+        "status": status.get("name", ""),
+        "status_category": status_cat.get("name", ""),
+        "assignee": assignee.get("displayName", ""),
+        "reporter": reporter.get("displayName", ""),
+        "priority": priority.get("name", ""),
+        "type": issuetype.get("name", ""),
+        "parent": parent.get("key", ""),
+        "labels": ", ".join(labels) if labels else "",
+        "components": ", ".join(c.get("name", "") for c in components),
+        "fix_versions": ", ".join(v.get("name", "") for v in fix_versions),
+        "description": fields.get("description") or "",
+        "created": fields.get("created", ""),
+        "updated": fields.get("updated", ""),
+    }
 
 
 async def get_issue(client: AtlassianClient, issue_key: str) -> OperationResult:
@@ -19,7 +71,7 @@ async def get_issue(client: AtlassianClient, issue_key: str) -> OperationResult:
 
     return OperationResult(
         name="get_issue",
-        data=data,
+        data=_extract_issue_detail(data),
         count=1,
         truncated=False,
         time_ms=elapsed,
@@ -48,7 +100,7 @@ async def search(
 
     return OperationResult(
         name="search",
-        data=issues,
+        data=[_extract_issue_summary(i) for i in issues],
         count=len(issues),
         truncated=truncated,
         time_ms=elapsed,

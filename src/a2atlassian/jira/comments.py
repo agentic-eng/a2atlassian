@@ -3,12 +3,42 @@
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from a2atlassian.formatter import OperationResult
 
 if TYPE_CHECKING:
     from a2atlassian.client import AtlassianClient
+
+
+def _extract_comment(raw: dict[str, Any]) -> dict[str, Any]:
+    """Extract key fields from a raw comment."""
+    author = raw.get("author") or {}
+    update_author = raw.get("updateAuthor") or {}
+    # Body can be string (v2) or ADF dict (v3)
+    body = raw.get("body", "")
+    if isinstance(body, dict):
+        # ADF — extract text content as fallback
+        body = _adf_to_text(body)
+    return {
+        "id": raw.get("id", ""),
+        "author": author.get("displayName", ""),
+        "updated_by": update_author.get("displayName", ""),
+        "body": body,
+        "created": raw.get("created", ""),
+        "updated": raw.get("updated", ""),
+    }
+
+
+def _adf_to_text(adf: dict[str, Any]) -> str:
+    """Rough ADF-to-text extractor — pulls text nodes recursively."""
+    parts: list[str] = []
+    for node in adf.get("content", []):
+        if node.get("type") == "text":
+            parts.append(node.get("text", ""))
+        elif "content" in node:
+            parts.append(_adf_to_text(node))
+    return "".join(parts)
 
 
 async def get_comments(
@@ -27,7 +57,7 @@ async def get_comments(
 
     return OperationResult(
         name="get_comments",
-        data=comments,
+        data=[_extract_comment(c) for c in comments],
         count=len(comments),
         truncated=total > len(comments),
         time_ms=elapsed,
@@ -42,7 +72,7 @@ async def add_comment(client: AtlassianClient, issue_key: str, body: str) -> Ope
 
     return OperationResult(
         name="add_comment",
-        data=data,
+        data=_extract_comment(data),
         count=1,
         truncated=False,
         time_ms=elapsed,
@@ -62,7 +92,7 @@ async def edit_comment(
 
     return OperationResult(
         name="edit_comment",
-        data=data,
+        data=_extract_comment(data),
         count=1,
         truncated=False,
         time_ms=elapsed,

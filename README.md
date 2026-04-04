@@ -59,13 +59,13 @@ pip install a2atlassian
 
 **Claude Code** (with pre-configured connection):
 ```bash
-claude mcp add -s user a2atlassian -- a2atlassian-mcp \
+claude mcp add -s user a2atlassian -- uvx --from a2atlassian a2atlassian-mcp \
   --register myproject https://mysite.atlassian.net user@company.com '${ATLASSIAN_TOKEN}'
 ```
 
 **Claude Code** (minimal — agent calls `login` on demand):
 ```bash
-claude mcp add -s user a2atlassian -- a2atlassian-mcp
+claude mcp add -s user a2atlassian -- uvx --from a2atlassian a2atlassian-mcp
 ```
 
 **Claude Desktop / Cursor / any MCP client** (`.mcp.json`):
@@ -75,7 +75,7 @@ claude mcp add -s user a2atlassian -- a2atlassian-mcp
     "a2atlassian": {
       "command": "uvx",
       "args": [
-        "a2atlassian-mcp",
+        "--from", "a2atlassian", "a2atlassian-mcp",
         "--register", "myproject", "https://mysite.atlassian.net",
         "user@company.com", "${ATLASSIAN_TOKEN}"
       ],
@@ -91,7 +91,7 @@ claude mcp add -s user a2atlassian -- a2atlassian-mcp
 ```json
 {
   "args": [
-    "a2atlassian-mcp",
+    "--from", "a2atlassian", "a2atlassian-mcp",
     "--register", "myproject", "https://mysite.atlassian.net", "user@a.com", "${TOKEN_A}",
     "--register", "personal", "https://personal.atlassian.net", "user@b.com", "${TOKEN_B}"
   ]
@@ -101,7 +101,7 @@ claude mcp add -s user a2atlassian -- a2atlassian-mcp
 **Scoped connections** (limit agent to specific saved projects):
 ```json
 {
-  "args": ["a2atlassian-mcp", "--scope", "myproject"]
+  "args": ["--from", "a2atlassian", "a2atlassian-mcp", "--scope", "myproject"]
 }
 ```
 
@@ -231,7 +231,7 @@ Use `--scope` to limit which saved connections a specific MCP instance can acces
 
 ```bash
 # Project config — only myproject visible, even if other connections are saved
-a2atlassian-mcp --scope myproject
+uvx --from a2atlassian a2atlassian-mcp --scope myproject
 ```
 
 Project-level MCP configs (`.claude/mcp.json`) override global configs — each repo sees only its own connections.
@@ -287,7 +287,7 @@ a2atlassian login -p myproject --url https://mysite.atlassian.net --email me@co.
 uv tool install a2atlassian
 
 # Pre-configured — no login needed
-a2atlassian-mcp --register ci https://mysite.atlassian.net ci-user@co.com "${CI_ATLASSIAN_TOKEN}"
+uvx --from a2atlassian a2atlassian-mcp --register ci https://mysite.atlassian.net ci-user@co.com "${CI_ATLASSIAN_TOKEN}"
 ```
 
 ## Development

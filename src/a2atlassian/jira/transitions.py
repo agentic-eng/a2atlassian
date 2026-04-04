@@ -3,12 +3,28 @@
 from __future__ import annotations
 
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from a2atlassian.formatter import OperationResult
 
 if TYPE_CHECKING:
     from a2atlassian.client import AtlassianClient
+
+
+def _extract_transition(raw: dict[str, Any]) -> dict[str, Any]:
+    """Extract key fields from a raw transition."""
+    to = raw.get("to", "")
+    # atlassian-python-api returns "to" as a string (status name),
+    # but the raw REST API returns it as a dict with a "name" key.
+    if isinstance(to, dict):
+        to_status = to.get("name", "")
+    else:
+        to_status = str(to)
+    return {
+        "id": str(raw.get("id", "")),
+        "name": raw.get("name", ""),
+        "to_status": to_status,
+    }
 
 
 async def get_transitions(client: AtlassianClient, issue_key: str) -> OperationResult:
@@ -19,7 +35,7 @@ async def get_transitions(client: AtlassianClient, issue_key: str) -> OperationR
 
     return OperationResult(
         name="get_transitions",
-        data=transitions,
+        data=[_extract_transition(t) for t in transitions],
         count=len(transitions),
         truncated=False,
         time_ms=elapsed,
