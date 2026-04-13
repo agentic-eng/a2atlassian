@@ -12,9 +12,9 @@
   <p align="center">
     <a href="https://pypi.org/project/a2atlassian/"><img src="https://img.shields.io/pypi/v/a2atlassian.svg" alt="PyPI"></a>
     <a href="https://pypi.org/project/a2atlassian/"><img src="https://img.shields.io/pypi/pyversions/a2atlassian.svg" alt="Python"></a>
-    <a href="https://github.com/agentic-eng/a2atlassian/blob/main/LICENSE"><img src="https://img.shields.io/github/license/agentic-eng/a2atlassian.svg" alt="License"></a>
-    <a href="https://github.com/agentic-eng/a2atlassian/actions"><img src="https://img.shields.io/github/actions/workflow/status/agentic-eng/a2atlassian/publish.yml" alt="CI"></a>
-    <a href="https://registry.modelcontextprotocol.io/servers/io.github.agentic-eng/a2atlassian"><img src="https://img.shields.io/badge/MCP-registry-blue" alt="MCP Registry"></a>
+    <a href="https://github.com/yoselabs/a2atlassian/blob/main/LICENSE"><img src="https://img.shields.io/github/license/yoselabs/a2atlassian.svg" alt="License"></a>
+    <a href="https://github.com/yoselabs/a2atlassian/actions"><img src="https://img.shields.io/github/actions/workflow/status/yoselabs/a2atlassian/publish.yml" alt="CI"></a>
+    <a href="https://registry.modelcontextprotocol.io/servers/io.github.yoselabs/a2atlassian"><img src="https://img.shields.io/badge/MCP-registry-blue" alt="MCP Registry"></a>
   </p>
   <p align="center">
     <a href="#quick-start">Quick Start</a> &middot;
@@ -316,4 +316,4 @@ Apache 2.0
   <sub>Built by <a href="https://github.com/iorlas">Denis Tomilin</a></sub>
 </p>
 
-<!-- mcp-name: io.github.agentic-eng/a2atlassian -->
+<!-- mcp-name: io.github.yoselabs/a2atlassian -->

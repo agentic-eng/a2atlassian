@@ -1,9 +1,9 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.agentic-eng/a2atlassian",
+  "name": "io.github.yoselabs/a2atlassian",
   "description": "Jira & Confluence for AI agents. Pre-configured connections, compact output.",
   "repository": {
-    "url": "https://github.com/agentic-eng/a2atlassian",
+    "url": "https://github.com/yoselabs/a2atlassian",
     "source": "github"
   },
   "version": "0.2.0",
