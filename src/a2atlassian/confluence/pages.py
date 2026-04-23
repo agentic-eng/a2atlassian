@@ -6,6 +6,7 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from a2atlassian.confluence.content_format import markdown_to_storage
+from a2atlassian.errors import AuthenticationError
 from a2atlassian.formatter import OperationResult
 
 if TYPE_CHECKING:
@@ -184,3 +185,65 @@ async def upsert_page(
         "url": links.get("webui", ""),
         "version": version,
     }
+
+
+def _classify_error(exc: BaseException) -> str:
+    if isinstance(exc, AuthenticationError):
+        return "permission"
+    status = None
+    from requests.exceptions import HTTPError  # noqa: PLC0415
+
+    if isinstance(exc, HTTPError):
+        status = getattr(exc.response, "status_code", None)
+    if status == 400:
+        return "format"
+    if status == 409:
+        return "conflict"
+    if status in (401, 403):
+        return "permission"
+    return "other"
+
+
+async def upsert_pages(
+    client: ConfluenceClient,
+    pages: list[dict[str, Any]],
+) -> OperationResult:
+    """Batch create-or-update. Returns per-page outcomes; never raises on partial failure."""
+    t0 = time.monotonic()
+    succeeded: list[dict[str, Any]] = []
+    failed: list[dict[str, Any]] = []
+    created = updated = 0
+
+    for page in pages:
+        title = page.get("title", "")
+        try:
+            out = await upsert_page(
+                client,
+                space=page["space"],
+                title=title,
+                content=page["content"],
+                parent_id=page.get("parent_id"),
+                page_id=page.get("page_id"),
+                content_format=page.get("content_format", "markdown"),
+                page_width=page.get("page_width"),
+                emoji=page.get("emoji"),
+                labels=page.get("labels"),
+            )
+            succeeded.append(out)
+            if out["status"] == "created":
+                created += 1
+            else:
+                updated += 1
+        except Exception as exc:  # noqa: BLE001 — batch semantics require swallowing per-page errors
+            failed.append({"title": title, "error": str(exc), "error_category": _classify_error(exc)})
+
+    elapsed = int((time.monotonic() - t0) * 1000)
+    summary = {"total": len(pages), "created": created, "updated": updated, "failed": len(failed)}
+
+    return OperationResult(
+        name="upsert_pages",
+        data={"succeeded": succeeded, "failed": failed, "summary": summary},
+        count=len(pages),
+        truncated=False,
+        time_ms=elapsed,
+    )

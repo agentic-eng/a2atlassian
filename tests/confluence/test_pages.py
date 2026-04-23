@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from a2atlassian.confluence.pages import get_page, get_page_children, resolve_page_identity, upsert_page
+from a2atlassian.confluence.pages import get_page, get_page_children, resolve_page_identity, upsert_page, upsert_pages
 from a2atlassian.confluence_client import ConfluenceClient
 from a2atlassian.connections import ConnectionInfo
 from a2atlassian.formatter import OperationResult
@@ -182,3 +182,57 @@ class TestUpsertSingle:
         )
         call = mock_client._confluence_instance.create_page.call_args
         assert call.kwargs.get("body") == raw  # passed through unchanged
+
+
+class TestUpsertBatch:
+    async def test_all_success(self, mock_client: ConfluenceClient) -> None:
+        mock_client._confluence_instance.get_page_by_title.return_value = None
+        mock_client._confluence_instance.create_page.side_effect = [
+            {"id": "1", "version": {"number": 1}, "_links": {"webui": "/p/1"}},
+            {"id": "2", "version": {"number": 1}, "_links": {"webui": "/p/2"}},
+        ]
+        result = await upsert_pages(
+            mock_client,
+            pages=[
+                {"space": "SP", "title": "A", "content": "hi"},
+                {"space": "SP", "title": "B", "content": "hello"},
+            ],
+        )
+        assert isinstance(result, OperationResult)
+        assert result.data["summary"] == {"total": 2, "created": 2, "updated": 0, "failed": 0}
+        assert len(result.data["succeeded"]) == 2
+        assert result.data["failed"] == []
+
+    async def test_partial_failure_does_not_raise(self, mock_client: ConfluenceClient) -> None:
+        from requests.exceptions import HTTPError
+        from requests.models import Response
+
+        def _err(status: int) -> HTTPError:
+            r = Response()
+            r.status_code = status
+            return HTTPError(response=r)
+
+        mock_client._confluence_instance.get_page_by_title.return_value = None
+        mock_client._confluence_instance.create_page.side_effect = [
+            {"id": "1", "version": {"number": 1}, "_links": {"webui": "/p/1"}},
+            _err(403),
+            _err(400),
+        ]
+        result = await upsert_pages(
+            mock_client,
+            pages=[
+                {"space": "SP", "title": "A", "content": "hi"},
+                {"space": "SP", "title": "B", "content": "hi"},
+                {"space": "SP", "title": "C", "content": "hi"},
+            ],
+        )
+        assert result.data["summary"] == {"total": 3, "created": 1, "updated": 0, "failed": 2}
+        assert len(result.data["succeeded"]) == 1
+        assert len(result.data["failed"]) == 2
+        categories = {f["error_category"] for f in result.data["failed"]}
+        assert "permission" in categories  # 403 via AuthenticationError
+        assert "format" in categories  # 400 raw HTTPError
+
+    async def test_empty_batch(self, mock_client: ConfluenceClient) -> None:
+        result = await upsert_pages(mock_client, pages=[])
+        assert result.data["summary"] == {"total": 0, "created": 0, "updated": 0, "failed": 0}
