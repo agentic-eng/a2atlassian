@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Record real Jira API responses as fixture files.
+"""Record real Jira and Confluence API responses as fixture files.
 
 Usage:
     A2ATLASSIAN_TEST_URL=https://test.atlassian.net \
@@ -11,6 +11,8 @@ Usage:
     A2ATLASSIAN_TEST_SPRINT_ID=1 \
     A2ATLASSIAN_TEST_FIELD_ID=customfield_10000 \
     A2ATLASSIAN_TEST_ACCOUNT_ID=712020:... \
+    A2ATLASSIAN_TEST_CONFLUENCE_SPACE=TEAM \
+    A2ATLASSIAN_TEST_CONFLUENCE_PAGE_ID=123456789 \
     python scripts/record_fixtures.py
 """
 
@@ -28,6 +30,7 @@ from typing import Any
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from a2atlassian.confluence_client import ConfluenceClient
 from a2atlassian.connections import ConnectionInfo
 from a2atlassian.jira_client import JiraClient
 
@@ -293,7 +296,135 @@ async def record_all() -> None:
     if project:
         await _record_create_issue(client, output_dir, url, project)
 
+    # --- Confluence fixtures ---
+    confluence_space = _env("A2ATLASSIAN_TEST_CONFLUENCE_SPACE")
+    confluence_page_id = _env("A2ATLASSIAN_TEST_CONFLUENCE_PAGE_ID")
+
+    if confluence_space or confluence_page_id:
+        confluence_conn = ConnectionInfo(connection="recorder-confluence", url=url, email=email, token=token, read_only=True)
+        confluence_client = ConfluenceClient(confluence_conn)
+        await _record_confluence_fixtures(confluence_client, output_dir, url, confluence_space, confluence_page_id)
+
     print("Done.")
+
+
+async def _record_confluence(
+    output_dir: Path,
+    url: str,
+    filename: str,
+    method_name: str,
+    args_desc: list[str],
+    coro: Any,
+) -> None:
+    """Like _record but additionally strips _expandable keys."""
+    try:
+        data = await coro
+        data = _drop_expandable(data)
+        data = anonymize(data, url)
+        data = _wrap_with_meta(data, method_name, args_desc)
+        (output_dir / filename).write_text(json.dumps(data, indent=2, default=str, ensure_ascii=False))
+        print(f"  OK  {filename}")
+    except Exception as exc:
+        print(f"  FAIL {filename}: {exc}")
+
+
+async def _record_confluence_fixtures(
+    client: ConfluenceClient,
+    output_dir: Path,
+    url: str,
+    space: str,
+    page_id: str,
+) -> None:
+    """Record Confluence fixture files from a live Confluence instance."""
+    print("Recording Confluence fixtures...")
+
+    r = lambda f, m, a, c: _record_confluence(output_dir, url, f, m, a, c)  # noqa: E731
+
+    if page_id:
+        await r(
+            "confluence_page.json",
+            "client._confluence.get_page_by_id",
+            [page_id, "body.storage,version,space"],
+            client._call(client._confluence.get_page_by_id, page_id, expand="body.storage,version,space"),
+        )
+        await r(
+            "confluence_page_children.json",
+            "client._confluence.get_page_child_by_type",
+            [page_id, "page", "0", "50"],
+            client._call(client._confluence.get_page_child_by_type, page_id, type="page", start=0, limit=50),
+        )
+
+    if space:
+        await r(
+            "confluence_cql_search.json",
+            "client._confluence.cql",
+            [f"space = {space} AND type = page"],
+            client._call(client._confluence.cql, f"space = {space} AND type = page", start=0, limit=10),
+        )
+
+    # Create+update probe — capture create and update response fixtures, then delete
+    probe_title = f"a2atlassian fixture probe {datetime.now(UTC).strftime('%Y-%m-%dT%H:%M:%SZ')}"
+    probe_id: str | None = None
+    try:
+        if space:
+            print(f"  Creating probe page: {probe_title!r}")
+            try:
+                create_raw = await client._call(
+                    client._confluence.create_page,
+                    space=space,
+                    title=probe_title,
+                    body="<p>fixture probe</p>",
+                    type="page",
+                    representation="storage",
+                )
+                probe_id = str(create_raw.get("id", ""))
+                create_data = _drop_expandable(create_raw)
+                create_data = anonymize(create_data, url)
+                create_data = _wrap_with_meta(create_data, "client._confluence.create_page", ["space=...", f"title={probe_title!r}"])
+                (output_dir / "confluence_create_page_response.json").write_text(
+                    json.dumps(create_data, indent=2, default=str, ensure_ascii=False)
+                )
+                print("  OK  confluence_create_page_response.json")
+            except Exception as exc:
+                print(f"  FAIL confluence_create_page_response.json: {exc}")
+
+            if probe_id:
+                print(f"  Updating probe page: {probe_id}")
+                try:
+                    update_raw = await client._call(
+                        client._confluence.update_page,
+                        page_id=probe_id,
+                        title=probe_title,
+                        body="<p>fixture probe updated</p>",
+                        representation="storage",
+                    )
+                    update_data = _drop_expandable(update_raw)
+                    update_data = anonymize(update_data, url)
+                    update_data = _wrap_with_meta(
+                        update_data, "client._confluence.update_page", [f"page_id={probe_id}", f"title={probe_title!r}"]
+                    )
+                    (output_dir / "confluence_update_page_response.json").write_text(
+                        json.dumps(update_data, indent=2, default=str, ensure_ascii=False)
+                    )
+                    print("  OK  confluence_update_page_response.json")
+                except Exception as exc:
+                    print(f"  FAIL confluence_update_page_response.json: {exc}")
+    finally:
+        if probe_id:
+            try:
+                await client._call(client._confluence.remove_page, probe_id)
+                print(f"  (cleaned up probe page {probe_id})")
+            except Exception as exc:
+                print(f"  WARNING: could not delete probe page {probe_id}: {exc}")
+
+
+def _drop_expandable(data: Any) -> Any:
+    """Recursively remove _expandable keys from API response dicts."""
+    if isinstance(data, dict):
+        return {k: _drop_expandable(v) for k, v in data.items() if k != "_expandable"}
+    if isinstance(data, list):
+        return [_drop_expandable(item) for item in data]
+    return data
 
 
 if __name__ == "__main__":
