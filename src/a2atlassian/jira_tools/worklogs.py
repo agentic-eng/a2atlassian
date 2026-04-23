@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from a2atlassian.client import AtlassianClient
-from a2atlassian.formatter import format_result
+from a2atlassian.decorators import mcp_tool
+from a2atlassian.formatter import OperationResult  # noqa: TC001 — FastMCP needs runtime annotation
 from a2atlassian.jira.worklogs import add_worklog, get_worklogs
 
 if TYPE_CHECKING:
@@ -23,14 +24,17 @@ def register_read(
     enricher: ErrorEnricher,
 ) -> None:
     @server.tool()
-    async def jira_get_worklogs(connection: str, issue_key: str, format: str = "toon") -> str:  # noqa: A002
-        """Get worklogs for a Jira issue."""
-        client = get_client(connection)
-        try:
-            result = await get_worklogs(client, issue_key)
-        except Exception as exc:  # noqa: BLE001
-            return enricher.enrich(str(exc), {"connection": connection})
-        return format_result(result, fmt=format)
+    @mcp_tool(enricher)
+    async def jira_get_worklogs(
+        connection: str,
+        issue_key: str,
+        format: Literal["toon", "json"] = "toon",  # noqa: A002
+    ) -> OperationResult:
+        """Get worklogs for a Jira issue.
+
+        Returns TOON by default (compact); pass format='json' for standard JSON shape.
+        """
+        return await get_worklogs(get_client(connection), issue_key)
 
 
 def register_write(
@@ -39,20 +43,16 @@ def register_write(
     enricher: ErrorEnricher,
 ) -> None:
     @server.tool()
+    @mcp_tool(enricher)
     async def jira_add_worklog(
         connection: str,
         issue_key: str,
         time_spent: str,
         comment: str = "",
-        format: str = "json",  # noqa: A002
-    ) -> str:
+        format: Literal["toon", "json"] = "json",  # noqa: A002
+    ) -> OperationResult:
         """Add a worklog entry to a Jira issue. time_spent is a string like '2h 30m'."""
         conn = get_connection(connection)
         if conn.read_only:
-            return enricher.enrich(f"Connection '{connection}' is read-only.", {"connection": connection})
-        client = AtlassianClient(conn)
-        try:
-            result = await add_worklog(client, issue_key, time_spent, comment=comment)
-        except Exception as exc:  # noqa: BLE001
-            return enricher.enrich(str(exc), {"connection": connection})
-        return format_result(result, fmt=format)
+            raise RuntimeError(f"Connection '{connection}' is read-only. Run: a2atlassian login -c {connection} --no-read-only")
+        return await add_worklog(AtlassianClient(conn), issue_key, time_spent, comment=comment)
