@@ -343,6 +343,35 @@ class TestLoginToolSignature:
         assert "admin@example.com" in loaded.worklog_admins
 
 
+class TestConfluenceWiring:
+    def test_known_domains_includes_confluence(self) -> None:
+        from a2atlassian.mcp_server import _parse_enable_args
+
+        parsed = _parse_enable_args(["--enable", "confluence"])
+        assert "confluence" in parsed
+
+    def test_instructions_mentions_confluence(self) -> None:
+        from a2atlassian.mcp_server import server
+
+        text = getattr(server, "instructions", "") or ""
+        assert "Confluence" in text
+        assert "Jira only today" not in text
+
+    def test_get_confluence_client_returns_confluence_client(self) -> None:
+        from a2atlassian.confluence_client import ConfluenceClient
+        from a2atlassian.connections import ConnectionInfo
+        from a2atlassian.mcp_server import _ephemeral_connections, _get_confluence_client
+
+        _ephemeral_connections["mp"] = ConnectionInfo(
+            connection="mp", url="https://x.atlassian.net", email="a@b", token="t", read_only=True
+        )
+        try:
+            client = _get_confluence_client("mp")
+            assert isinstance(client, ConfluenceClient)
+        finally:
+            _ephemeral_connections.pop("mp", None)
+
+
 class TestToolDeletions:
     def test_jira_get_issue_dev_info_is_absent(self) -> None:
         """Ensure the deleted placeholder tool is gone from source."""

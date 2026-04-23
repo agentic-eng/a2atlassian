@@ -7,6 +7,8 @@ import sys
 from mcp.server.fastmcp import FastMCP
 
 from a2atlassian.config import DEFAULT_CONFIG_DIR
+from a2atlassian.confluence_client import ConfluenceClient
+from a2atlassian.confluence_tools import FEATURES as CONFLUENCE_FEATURES
 from a2atlassian.connections import ConnectionInfo, ConnectionStore
 from a2atlassian.errors import ErrorEnricher
 from a2atlassian.jira_client import JiraClient
@@ -15,8 +17,7 @@ from a2atlassian.jira_tools import FEATURES as JIRA_FEATURES
 server = FastMCP(
     "a2atlassian",
     instructions=(
-        "Agent-to-Atlassian — work with Jira. "
-        "Scope today: Jira only. For Confluence, use mcp__atlassian (sooperset). "
+        "Agent-to-Atlassian — works with both Jira and Confluence. "
         "Connections are identified by a connection name. "
         "Use 'login' to save a connection, then call tools with the connection name. "
         "Connections are read-only by default; re-login with --read-only false to enable writes. "
@@ -54,6 +55,11 @@ def _get_connection(connection: str) -> ConnectionInfo:
 def _get_jira_client(connection: str) -> JiraClient:
     """Resolve a connection and return a Jira client."""
     return JiraClient(_get_connection(connection))
+
+
+def _get_confluence_client(connection: str) -> ConfluenceClient:
+    """Resolve a connection and return a Confluence client."""
+    return ConfluenceClient(_get_connection(connection))
 
 
 # --- Connection management tools ---
@@ -149,6 +155,23 @@ def _register_jira_tools(features: set[str] | None) -> None:
             continue
         if hasattr(mod, "register_read"):
             mod.register_read(server, _get_jira_client, _enricher)
+        if hasattr(mod, "register_write"):
+            mod.register_write(server, _get_connection, _enricher)
+
+
+def _register_confluence_tools(features: set[str] | None) -> None:
+    if features is not None:
+        unknown = features - set(CONFLUENCE_FEATURES.keys())
+        if unknown:
+            sys.exit(
+                f"Error: unknown Confluence feature(s): {', '.join(sorted(unknown))}. "
+                f"Available: {', '.join(sorted(CONFLUENCE_FEATURES.keys()))}"
+            )
+    for name, mod in CONFLUENCE_FEATURES.items():
+        if features is not None and name not in features:
+            continue
+        if hasattr(mod, "register_read"):
+            mod.register_read(server, _get_confluence_client, _enricher)
         if hasattr(mod, "register_write"):
             mod.register_write(server, _get_connection, _enricher)
 
@@ -260,7 +283,7 @@ def main() -> None:
 
     # Validate domain names
     if enable:
-        known_domains = {"jira"}  # add "confluence" when it ships
+        known_domains = {"jira", "confluence"}
         unknown_domains = set(enable.keys()) - known_domains
         if unknown_domains:
             sys.exit(f"Error: unknown domain(s): {', '.join(sorted(unknown_domains))}. Available: {', '.join(sorted(known_domains))}")
@@ -268,6 +291,9 @@ def main() -> None:
     # Register domain tools based on --enable flags
     if _domain_enabled("jira", enable):
         _register_jira_tools(_domain_features("jira", enable))
+
+    if _domain_enabled("confluence", enable):
+        _register_confluence_tools(_domain_features("confluence", enable))
 
     server.run()
 
