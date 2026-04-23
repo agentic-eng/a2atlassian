@@ -11,6 +11,9 @@ if TYPE_CHECKING:
     from a2atlassian.client import AtlassianClient
 
 
+DEFAULT_SEARCH_FIELDS: list[str] = ["summary", "status", "assignee", "priority", "issuetype", "parent", "updated"]
+
+
 def _extract_issue_summary(raw: dict[str, Any]) -> dict[str, Any]:
     """Extract key fields from a raw issue for list display."""
     fields = raw.get("fields", {})
@@ -83,15 +86,25 @@ async def search(
     jql: str,
     limit: int = 50,
     offset: int = 0,
+    fields: list[str] | None = None,
 ) -> OperationResult:
-    """Search Jira issues by JQL query."""
+    """Search Jira issues by JQL query.
+
+    fields:
+      - None (default) → minimal field set (DEFAULT_SEARCH_FIELDS).
+      - ["*all"] → omit fields kwarg; returns every field per issue (large).
+      - explicit list → forwarded verbatim.
+    """
+    kwargs: dict[str, Any] = {"limit": limit, "start": offset}
+    if fields is None:
+        kwargs["fields"] = DEFAULT_SEARCH_FIELDS
+    elif fields == ["*all"]:
+        pass  # omit fields to get everything
+    else:
+        kwargs["fields"] = fields
+
     t0 = time.monotonic()
-    response = await client._call(
-        client._jira.jql,
-        jql,
-        limit=limit,
-        start=offset,
-    )
+    response = await client._call(client._jira.jql, jql, **kwargs)
     elapsed = int((time.monotonic() - t0) * 1000)
 
     issues = response.get("issues", [])

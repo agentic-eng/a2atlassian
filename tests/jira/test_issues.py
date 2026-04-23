@@ -102,7 +102,33 @@ class TestSearch:
     async def test_pagination_params(self, mock_client: AtlassianClient) -> None:
         mock_client._jira_instance.jql.return_value = {"issues": [], "total": 0}
         await search(mock_client, "project = PROJ", limit=25, offset=10)
-        mock_client._jira_instance.jql.assert_called_once_with("project = PROJ", limit=25, start=10)
+        mock_client._jira_instance.jql.assert_called_once_with(
+            "project = PROJ",
+            limit=25,
+            start=10,
+            fields=["summary", "status", "assignee", "priority", "issuetype", "parent", "updated"],
+        )
+
+    async def test_default_fields_is_minimal(self, mock_client: AtlassianClient) -> None:
+        """search() with no fields param passes the minimal default set."""
+        mock_client._jira_instance.jql.return_value = {"issues": [], "total": 0}
+        await search(mock_client, "project = X")
+        call_kwargs = mock_client._jira_instance.jql.call_args.kwargs
+        assert call_kwargs["fields"] == ["summary", "status", "assignee", "priority", "issuetype", "parent", "updated"]
+
+    async def test_all_fields_sentinel_omits_fields(self, mock_client: AtlassianClient) -> None:
+        """fields=['*all'] passes no fields kwarg (returns everything)."""
+        mock_client._jira_instance.jql.return_value = {"issues": [], "total": 0}
+        await search(mock_client, "project = X", fields=["*all"])
+        call_kwargs = mock_client._jira_instance.jql.call_args.kwargs
+        assert "fields" not in call_kwargs
+
+    async def test_explicit_fields_passed_through(self, mock_client: AtlassianClient) -> None:
+        """Explicit fields list is forwarded verbatim."""
+        mock_client._jira_instance.jql.return_value = {"issues": [], "total": 0}
+        await search(mock_client, "project = X", fields=["summary", "comment"])
+        call_kwargs = mock_client._jira_instance.jql.call_args.kwargs
+        assert call_kwargs["fields"] == ["summary", "comment"]
 
 
 class TestCreateIssue:

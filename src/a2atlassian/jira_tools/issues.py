@@ -40,13 +40,16 @@ def register_read(
         jql: str,
         limit: int = 50,
         offset: int = 0,
+        fields: list[str] | None = None,
         format: Literal["toon", "json"] = "toon",  # noqa: A002
     ) -> OperationResult:
         """Search Jira issues using JQL. Returns list of matching issues.
 
+        Default returns a minimal field set (summary/status/assignee/priority/type/parent/updated).
+        Pass fields=["*all"] for full payload — can be very large.
         Returns TOON by default (compact); pass format='json' for standard JSON shape.
         """
-        return await search(get_client(connection), jql, limit=limit, offset=offset)
+        return await search(get_client(connection), jql, limit=limit, offset=offset, fields=fields)
 
     @server.tool()
     @mcp_tool(enricher)
