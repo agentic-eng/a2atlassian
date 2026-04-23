@@ -1,0 +1,28 @@
+{
+  "issue_key": "PE0-42",
+  "assignee_display_name": "Alice",
+  "assignee_email": "alice@example.com",
+  "worklogs": [
+    {
+      "id": "w1",
+      "author": {"displayName": "Alice", "emailAddress": "alice@example.com"},
+      "started": "2026-04-22T10:00:00.000+0300",
+      "timeSpentSeconds": 14400,
+      "comment": "Implemented feature X"
+    },
+    {
+      "id": "w2",
+      "author": {"displayName": "Denis", "emailAddress": "denis@example.com"},
+      "started": "2026-04-22T18:00:00.000+0300",
+      "timeSpentSeconds": 3600,
+      "comment": "Proxy-logged for Alice during daily"
+    },
+    {
+      "id": "w3",
+      "author": {"displayName": "Bob", "emailAddress": "bob@example.com"},
+      "started": "2026-04-22T14:00:00.000+0300",
+      "timeSpentSeconds": 7200,
+      "comment": "Code review"
+    }
+  ]
+}
