@@ -48,7 +48,7 @@ Existing Atlassian MCP servers (Rovo, sooperset) require Docker, `.env` files, a
 - **Error enrichment** — bad field names get suggestions, JQL typos get corrections, quirks get auto-fixed
 - **Secrets stay in env** — `${ATLASSIAN_TOKEN}` in configs, expanded only at runtime
 
-> **Scope today:** a2atlassian ships Jira and Confluence tools. Confluence support shipped in v0.4.0.
+> **Scope today:** full Jira surface (issues, comments, sprints, boards, worklogs, links, versions, fields, watchers, projects) and Confluence core (pages CRUD, search, metadata-only writes).
 
 ## Quick Start
 
@@ -116,13 +116,19 @@ claude mcp add -s user a2atlassian -- uvx --from a2atlassian a2atlassian-mcp
 
 ```bash
 # Save a connection (validates by calling /myself)
-a2atlassian login -p myproject \
+a2atlassian login -c myproject \
   --url https://mysite.atlassian.net \
   --email user@company.com \
   --token "$ATLASSIAN_TOKEN"
 
+# Same, pulling the token from 1Password via `op`
+a2atlassian login -c myproject \
+  --url https://mysite.atlassian.net \
+  --email user@company.com \
+  --token "op://Personal/Atlassian/token"
+
 # Enable writes
-a2atlassian login -p myproject \
+a2atlassian login -c myproject \
   --url https://mysite.atlassian.net \
   --email user@company.com \
   --token "$ATLASSIAN_TOKEN" \
@@ -130,8 +136,11 @@ a2atlassian login -p myproject \
 
 # List / remove connections
 a2atlassian connections
-a2atlassian logout -p myproject
+a2atlassian logout -c myproject
 ```
+
+Tokens accept three forms: literal value, `${ENV_VAR}` reference, or
+`op://vault/item/field` (resolved via the 1Password CLI at runtime).
 
 ## MCP Tools
 
@@ -149,25 +158,55 @@ a2atlassian logout -p myproject
 |------|-------------|
 | `jira_get_issue` | Get issue by key — full fields, status, assignee |
 | `jira_search` | Search by JQL with pagination — compact TSV output by default |
+| `jira_search_count` | Count-only JQL — cheap pre-check for "is this going to be huge?" |
+| `jira_search_fields` | Discover custom-field IDs by name |
+| `jira_get_field_options` | List allowed values for a select / multi-select field |
 | `jira_get_comments` | Get all comments for an issue |
+| `jira_get_worklogs` | Get all worklogs for an issue |
 | `jira_get_transitions` | Discover available status transitions |
+| `jira_get_link_types` | List available issue-link types |
+| `jira_get_watchers` | List watchers for an issue |
+| `jira_get_projects` | List projects accessible to the connection |
+| `jira_get_project_metadata` | Fetch creation metadata (issue types, required fields) |
+| `jira_get_user_profile` | Resolve an email/accountId to a full user profile |
+| `jira_get_boards` | List agile boards in a project |
+| `jira_get_board_issues` | Issues on a board (paginated) |
+| `jira_get_sprints` | List sprints on a board |
+| `jira_get_sprint_issues` | Issues in a sprint (paginated) |
 
 ### Jira — Write (requires read-write connection)
 
 | Tool | Description |
 |------|-------------|
+| `jira_create_issue` | Create a new issue |
+| `jira_update_issue` | Update fields on an existing issue |
+| `jira_delete_issue` | Delete an issue |
+| `jira_transition_issue` | Move issue to a new status |
 | `jira_add_comment` | Add comment (wiki markup, API v2) |
 | `jira_edit_comment` | Update existing comment |
-| `jira_transition_issue` | Move issue to new status |
+| `jira_add_worklog` | Log time on an issue |
+| `jira_create_issue_link` | Link two issues |
+| `jira_remove_issue_link` | Remove an issue link |
+| `jira_set_watchers` | Replace the watcher set on an issue |
+| `jira_create_sprint` | Create a sprint on a board |
+| `jira_update_sprint` | Update sprint state / dates |
+| `jira_add_issues_to_sprint` | Move issues into a sprint |
+| `jira_create_version` | Create a project version |
 
-## Confluence tools
+### Confluence — Read
 
-| Tool                         | Purpose                                                     |
-|------------------------------|-------------------------------------------------------------|
-| confluence_get_page          | Fetch a page by id (body storage, version, space)           |
-| confluence_get_page_children | List direct children of a page (paginated)                  |
-| confluence_search            | CQL search; minimal per-match rows                          |
-| confluence_upsert_pages      | Batch create-or-update with per-page status + partial-failure shape |
+| Tool | Description |
+|------|-------------|
+| `confluence_get_page` | Fetch a page by id (body storage, version, space) |
+| `confluence_get_page_children` | List direct children of a page (paginated) |
+| `confluence_search` | CQL search; minimal per-match rows |
+
+### Confluence — Write (requires read-write connection)
+
+| Tool | Description |
+|------|-------------|
+| `confluence_upsert_pages` | Batch create-or-update with preserve-on-omit body semantics + per-page status + partial-failure shape |
+| `confluence_set_page_properties` | Metadata-only write (page_width, emoji, labels) — physically cannot touch body or title |
 
 ### Output Formats
 
@@ -259,7 +298,7 @@ Built-in retry with exponential backoff for Atlassian's rate limits (429) and tr
 | Feature | a2atlassian | Rovo (official) | sooperset/mcp-atlassian |
 |---------|-------------|-----------------|------------------------|
 | **Setup** | `pip install` | OAuth + Docker | Docker + .env + mcp-remote |
-| **Tools in context** | 10 (Phase 1) | ~72 | ~72 |
+| **Tools in context** | ~35 (loaded on demand) | ~72 | ~72 |
 | **Connection management** | TOML + `--register` + `--scope` | Per-session OAuth | .env file |
 | **Multi-project** | Yes (scoped) | No | One .env per setup |
 | **Read-only default** | Yes (per-connection) | No | No |
@@ -272,11 +311,9 @@ Built-in retry with exponential backoff for Atlassian's rate limits (429) and tr
 
 ## Roadmap
 
-**Phase 1 (current):** Jira core — get/search issues, comments (CRUD), transitions. The secondary critical path.
+**Shipped:** Jira full surface (v0.3.0) · Confluence core + markdown-to-storage with full CommonMark + GFM fidelity (v0.4.0, v0.5.2) · 1Password `op://` token refs (v0.5.1) · metadata-only Confluence writes + preserve-on-omit body semantics (v0.5.2).
 
-**Phase 2:** Full Jira surface — sprints, boards, links, projects, fields, worklogs, attachments, watchers.
-
-**Phase 3:** Confluence — pages, comments, attachments, labels, search.
+**Next:** `confluence_delete_page`, Confluence comments + attachments, Confluence integration-test path. Backlog in [`TODO.md`](TODO.md).
 
 ## Setup by Environment
 
@@ -307,12 +344,18 @@ uvx --from a2atlassian a2atlassian-mcp --register ci https://mysite.atlassian.ne
 ## Development
 
 ```bash
-make bootstrap   # Install deps + hooks
-make check       # Lint + test + security (full gate)
+make bootstrap   # Install deps + pnpm + git hooks
+make check       # Lint + test + coverage-diff + security (full gate)
 make test        # Tests with coverage
-make lint        # Lint only (never modifies files)
+make lint        # agent-harness + jscpd + actionlint (never modifies files)
 make fix         # Auto-fix + lint
+make similar     # Advisory: report similarly-named functions/classes
 ```
+
+Linters: `ruff` + `ty` (via agent-harness), `yamllint`, `jscpd` (copy-paste
+detection via pnpm), `actionlint` (GitHub Actions workflows). Pre-commit
+hooks run `agent-harness fix` + lint on every commit. Install `pnpm` and
+`actionlint` via `brew install pnpm actionlint`.
 
 ## License
 
