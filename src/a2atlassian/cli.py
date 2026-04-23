@@ -57,7 +57,7 @@ def cli(ctx: click.Context) -> None:
 @click.option("-c", "--connection", required=True, help="Connection name")
 @click.option("--url", required=True, help="Atlassian site URL (e.g., https://mysite.atlassian.net)")
 @click.option("--email", required=True, help="Account email")
-@click.option("--token", required=True, help="API token (or ${ENV_VAR} reference)")
+@click.option("--token", required=True, help="API token. Literal, ${ENV_VAR} ref, or op://vault/item/field (1Password CLI).")
 @click.option("--read-only/--no-read-only", default=True, help="Read-only mode (default: true)")
 @click.option("--tz", "timezone", default="UTC", help="Timezone (IANA name or alias: CET, ET, UTC; default UTC)")
 @click.option("--worklog-admin", "worklog_admins", multiple=True, help="Email(s) allowed to proxy-log worklog hours. Repeat for multiple.")

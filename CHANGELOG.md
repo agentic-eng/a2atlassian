@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.5.1 — 2026-04-23
+
+### Docs
+- `a2atlassian login --token` and the MCP `login` tool now advertise `op://` 1Password references alongside `${ENV_VAR}`.
+
 ## v0.5.0 — 2026-04-23
 
 ### Changed (breaking)

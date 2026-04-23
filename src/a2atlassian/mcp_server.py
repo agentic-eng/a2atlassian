@@ -77,8 +77,12 @@ async def login(
 ) -> str:
     """Save an Atlassian connection. Validates by calling /myself.
 
-    For security, prefer passing token as ${ENV_VAR} reference (e.g., "${ATLASSIAN_TOKEN}")
-    rather than a literal value. The variable is expanded at runtime, never stored resolved.
+    For security, prefer a reference over a literal token value. Two reference forms
+    are supported and resolved at call time (never stored resolved):
+      - ${ENV_VAR} — read from the environment, e.g. "${ATLASSIAN_TOKEN}".
+      - op://vault/item/field — fetch via the 1Password CLI (`op read`). Requires
+        the `op` binary on PATH and the user signed in; falls back to the literal
+        string if `op` is missing or the fetch fails.
 
     timezone: IANA zone name (e.g., 'Europe/Istanbul'); default 'UTC'. Used for
     day-boundary math in jira_get_worklogs summary mode.
