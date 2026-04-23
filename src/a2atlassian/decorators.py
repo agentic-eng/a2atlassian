@@ -89,6 +89,8 @@ def mcp_tool(
                     ctx["connection"] = connection
                 return enricher.enrich(str(exc), ctx)
 
+            if isinstance(result, str):
+                return result
             fmt = bound.arguments.get("format", "toon")
             return format_result(result, fmt=fmt)
 
