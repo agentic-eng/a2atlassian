@@ -1,0 +1,12 @@
+{
+  "results": [
+    {
+      "content": {"id": "300", "type": "page", "title": "Spec", "_links": {"webui": "/pages/300"}},
+      "title": "Spec",
+      "excerpt": "First paragraph snippet",
+      "lastModified": "2026-04-20T12:00:00.000Z",
+      "friendlyLastModified": "3 days ago"
+    }
+  ],
+  "start": 0, "limit": 25, "size": 1, "totalSize": 1
+}
