@@ -1,4 +1,8 @@
-"""Async Atlassian client — wraps atlassian-python-api with retry and rate limiting."""
+"""Shared Atlassian client base — retry, auth, rate limiting.
+
+Service-specific subclasses (JiraClient, ConfluenceClient) own the lazy
+`atlassian-python-api` instance. Keep this file free of service imports.
+"""
 
 from __future__ import annotations
 
@@ -15,15 +19,8 @@ if TYPE_CHECKING:
     from a2atlassian.connections import ConnectionInfo
 
 
-def _lazy_jira():
-    """Lazy import to avoid loading atlassian module at import time."""
-    from atlassian import Jira  # noqa: PLC0415
-
-    return Jira
-
-
-class AtlassianClient:
-    """Async wrapper around atlassian-python-api Jira client."""
+class AtlassianClientBase:
+    """Shared retry/auth wrapper. Subclasses provide a service instance."""
 
     MAX_RETRIES = 2
     RETRY_BACKOFF: list[float] = [1.0, 3.0]  # noqa: RUF012
@@ -31,20 +28,6 @@ class AtlassianClient:
 
     def __init__(self, connection: ConnectionInfo) -> None:
         self.connection = connection
-        self._jira_instance: Any | None = None
-
-    @property
-    def _jira(self) -> Any:
-        """Lazily create the Jira client."""
-        if self._jira_instance is None:
-            jira_cls = _lazy_jira()
-            self._jira_instance = jira_cls(
-                url=self.connection.url,
-                username=self.connection.email,
-                password=self.connection.resolved_token,
-                cloud=True,
-            )
-        return self._jira_instance
 
     async def _call(self, fn: Callable, *args: Any, **kwargs: Any) -> Any:
         """Call a sync atlassian-python-api method with retry logic."""
@@ -75,8 +58,8 @@ class AtlassianClient:
                 raise
 
         msg = "Unexpected: retry loop exited without returning or raising"
-        raise A2AtlassianError(msg)  # unreachable — loop always raises or returns
+        raise A2AtlassianError(msg)  # pragma: no cover
 
-    async def validate(self) -> dict:
-        """Validate the connection by calling /myself. Returns user info."""
-        return await self._call(self._jira.myself)
+
+# Temporary shim — removed in Task 4 once every caller imports from jira_client.
+from a2atlassian.jira_client import JiraClient as AtlassianClient  # noqa: E402, F401

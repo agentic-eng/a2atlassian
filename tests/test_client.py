@@ -5,10 +5,12 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
+from requests.exceptions import HTTPError
+from requests.models import Response
 
-from a2atlassian.client import AtlassianClient
+from a2atlassian.client import AtlassianClient, AtlassianClientBase
 from a2atlassian.connections import ConnectionInfo
-from a2atlassian.errors import AuthenticationError, RateLimitError
+from a2atlassian.errors import AuthenticationError, RateLimitError, ServerError
 
 
 @pytest.fixture
@@ -33,7 +35,7 @@ class TestAtlassianClient:
     def test_init(self, client: AtlassianClient) -> None:
         assert client.connection.connection == "test"
 
-    @patch("a2atlassian.client._lazy_jira")
+    @patch("a2atlassian.jira_client._lazy_jira")
     async def test_jira_property_creates_instance(self, mock_lazy: MagicMock, connection: ConnectionInfo) -> None:
         mock_jira_cls = MagicMock()
         mock_lazy.return_value = mock_jira_cls
@@ -46,7 +48,7 @@ class TestAtlassianClient:
             cloud=True,
         )
 
-    @patch("a2atlassian.client._lazy_jira")
+    @patch("a2atlassian.jira_client._lazy_jira")
     async def test_jira_cached(self, mock_lazy: MagicMock, connection: ConnectionInfo) -> None:
         mock_jira_cls = MagicMock()
         mock_lazy.return_value = mock_jira_cls
@@ -109,3 +111,58 @@ class TestAtlassianClient:
         with patch("asyncio.sleep", new_callable=AsyncMock), pytest.raises(RateLimitError):
             await client._call(mock_fn)
         assert mock_fn.call_count == 3
+
+
+def _make_http_error(status: int) -> HTTPError:
+    resp = Response()
+    resp.status_code = status
+    return HTTPError(response=resp)
+
+
+@pytest.fixture
+def base_client() -> AtlassianClientBase:
+    conn = ConnectionInfo(
+        project="t",
+        url="https://t.atlassian.net",
+        email="t@t.com",
+        token="tok",
+        read_only=True,
+    )
+    return AtlassianClientBase(conn)
+
+
+class TestBaseRetry:
+    async def test_401_raises_authentication_error(self, base_client: AtlassianClientBase) -> None:
+        def boom() -> None:
+            raise _make_http_error(401)
+
+        with pytest.raises(AuthenticationError):
+            await base_client._call(boom)
+
+    async def test_429_retries_then_raises_rate_limit(self, base_client: AtlassianClientBase) -> None:
+        calls = 0
+
+        def boom() -> None:
+            nonlocal calls
+            calls += 1
+            raise _make_http_error(429)
+
+        base_client.RETRY_BACKOFF = [0.0, 0.0]
+        with pytest.raises(RateLimitError):
+            await base_client._call(boom)
+        assert calls == base_client.MAX_RETRIES + 1
+
+    async def test_500_retries_then_raises_server_error(self, base_client: AtlassianClientBase) -> None:
+        def boom() -> None:
+            raise _make_http_error(503)
+
+        base_client.RETRY_BACKOFF = [0.0, 0.0]
+        with pytest.raises(ServerError):
+            await base_client._call(boom)
+
+    async def test_success_returns_value(self, base_client: AtlassianClientBase) -> None:
+        def ok() -> str:
+            return "hello"
+
+        result = await base_client._call(ok)
+        assert result == "hello"
