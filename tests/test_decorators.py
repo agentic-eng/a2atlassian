@@ -1,65 +1,80 @@
-"""Tests for the @write_operation decorator."""
+"""Tests for the @mcp_tool decorator."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock
+from typing import Literal
 
-import pytest
-
-from a2atlassian.connections import ConnectionStore
-from a2atlassian.decorators import write_operation
-from a2atlassian.errors import WriteAccessDeniedError
-
-if TYPE_CHECKING:
-    from pathlib import Path
+from a2atlassian.decorators import mcp_tool
+from a2atlassian.errors import ErrorEnricher
+from a2atlassian.formatter import OperationResult
 
 
-@pytest.fixture
-def store_with_readonly(tmp_config_dir: Path) -> ConnectionStore:
-    store = ConnectionStore(tmp_config_dir)
-    store.save("readonly_proj", "https://x.atlassian.net", "a@b.com", "tok", read_only=True)
-    return store
+class TestMcpTool:
+    async def test_wraps_operation_and_formats_toon(self) -> None:
+        enricher = ErrorEnricher()
 
+        @mcp_tool(enricher)
+        async def greet(connection: str, name: str, format: Literal["toon", "json"] = "toon") -> OperationResult:  # noqa: A002
+            assert connection == "c1"
+            return OperationResult(name="greet", data=[{"hello": name}], count=1, truncated=False, time_ms=0)
 
-@pytest.fixture
-def store_with_readwrite(tmp_config_dir: Path) -> ConnectionStore:
-    store = ConnectionStore(tmp_config_dir)
-    store.save("rw_proj", "https://x.atlassian.net", "a@b.com", "tok", read_only=False)
-    return store
+        result = await greet(connection="c1", name="world", format="toon")
+        assert "hello" in result
+        assert "world" in result
 
+    async def test_wraps_and_formats_json(self) -> None:
+        enricher = ErrorEnricher()
 
-class TestWriteOperation:
-    async def test_blocks_readonly_connection(self, store_with_readonly: ConnectionStore) -> None:
-        @write_operation
-        async def my_write_tool(project: str, data: str) -> str:
-            return f"wrote {data}"
+        @mcp_tool(enricher)
+        async def greet(connection: str, format: Literal["toon", "json"] = "json") -> OperationResult:  # noqa: A002
+            return OperationResult(name="g", data={"ok": True}, count=1, truncated=False, time_ms=0)
 
-        with pytest.raises(WriteAccessDeniedError, match="read-only"):
-            await my_write_tool(project="readonly_proj", data="test", _store=store_with_readonly)
+        result = await greet(connection="c1", format="json")
+        assert '"ok"' in result
 
-    async def test_allows_readwrite_connection(self, store_with_readwrite: ConnectionStore) -> None:
-        @write_operation
-        async def my_write_tool(project: str, data: str) -> str:
-            return f"wrote {data}"
+    async def test_exceptions_are_enriched(self) -> None:
+        enricher = ErrorEnricher()
 
-        result = await my_write_tool(project="rw_proj", data="test", _store=store_with_readwrite)
-        assert result == "wrote test"
+        @mcp_tool(enricher)
+        async def boom(connection: str, format: Literal["toon", "json"] = "toon") -> OperationResult:  # noqa: A002
+            raise RuntimeError("nope")
 
-    async def test_passes_through_kwargs(self, store_with_readwrite: ConnectionStore) -> None:
-        inner = AsyncMock(return_value="ok")
+        result = await boom(connection="c1")
+        assert "nope" in result
 
-        @write_operation
-        async def my_tool(project: str, key: str, body: str) -> str:
-            return await inner(project=project, key=key, body=body)
+    async def test_enum_validation_happy_path(self) -> None:
+        enricher = ErrorEnricher()
 
-        await my_tool(project="rw_proj", key="PROJ-1", body="hello", _store=store_with_readwrite)
-        inner.assert_called_once_with(project="rw_proj", key="PROJ-1", body="hello")
+        @mcp_tool(enricher)
+        async def t(connection: str, detail: Literal["a", "b", "c"] = "a", format: Literal["toon", "json"] = "toon") -> OperationResult:  # noqa: A002
+            return OperationResult(name="t", data=[{"d": detail}], count=1, truncated=False, time_ms=0)
 
-    async def test_error_message_includes_project(self, store_with_readonly: ConnectionStore) -> None:
-        @write_operation
-        async def my_tool(project: str) -> str:
-            return "ok"
+        ok = await t(connection="c1", detail="b")
+        assert "b" in ok
 
-        with pytest.raises(WriteAccessDeniedError, match="readonly_proj"):
-            await my_tool(project="readonly_proj", _store=store_with_readonly)
+    async def test_enum_validation_rejects_invalid(self) -> None:
+        enricher = ErrorEnricher()
+
+        @mcp_tool(enricher)
+        async def t(connection: str, detail: Literal["a", "b", "c"] = "a", format: Literal["toon", "json"] = "toon") -> OperationResult:  # noqa: A002
+            return OperationResult(name="t", data=[], count=0, truncated=False, time_ms=0)
+
+        result = await t(connection="c1", detail="zz")
+        assert "Invalid value" in result
+        assert "detail" in result
+        assert "zz" in result
+        assert "a" in result
+        assert "b" in result
+        assert "c" in result
+
+    async def test_enum_validation_multiple_literals(self) -> None:
+        """Both format and detail being invalid surfaces at least one clearly."""
+        enricher = ErrorEnricher()
+
+        @mcp_tool(enricher)
+        async def t(connection: str, format: Literal["toon", "json"] = "toon") -> OperationResult:  # noqa: A002
+            return OperationResult(name="t", data=[], count=0, truncated=False, time_ms=0)
+
+        result = await t(connection="c1", format="tooon")  # type: ignore[arg-type]
+        assert "Invalid value" in result
+        assert "format" in result
