@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Literal
 from a2atlassian.client import AtlassianClient
 from a2atlassian.decorators import mcp_tool
 from a2atlassian.formatter import OperationResult  # noqa: TC001 — FastMCP needs runtime annotation
-from a2atlassian.jira.issues import create_issue, delete_issue, get_issue, search, update_issue
+from a2atlassian.jira.issues import create_issue, delete_issue, get_issue, search, search_count, update_issue
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -50,6 +50,12 @@ def register_read(
         Returns TOON by default (compact); pass format='json' for standard JSON shape.
         """
         return await search(get_client(connection), jql, limit=limit, offset=offset, fields=fields)
+
+    @server.tool()
+    @mcp_tool(enricher)
+    async def jira_search_count(connection: str, jql: str, format: Literal["toon", "json"] = "json") -> OperationResult:  # noqa: A002
+        """Return the total number of Jira issues matching a JQL query. Cheap pre-check before a broad search."""
+        return await search_count(get_client(connection), jql)
 
     @server.tool()
     @mcp_tool(enricher)

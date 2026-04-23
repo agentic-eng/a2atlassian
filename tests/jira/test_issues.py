@@ -9,7 +9,7 @@ import pytest
 from a2atlassian.client import AtlassianClient
 from a2atlassian.connections import ConnectionInfo
 from a2atlassian.formatter import OperationResult
-from a2atlassian.jira.issues import create_issue, delete_issue, get_issue, search, update_issue
+from a2atlassian.jira.issues import create_issue, delete_issue, get_issue, search, search_count, update_issue
 
 
 @pytest.fixture
@@ -201,3 +201,17 @@ class TestDeleteIssue:
         assert result.data["issue_key"] == "PROJ-1"
         assert result.data["status"] == "deleted"
         mock_client._jira_instance.delete_issue.assert_called_once_with("PROJ-1")
+
+
+class TestSearchCount:
+    async def test_returns_total(self, mock_client: AtlassianClient) -> None:
+        mock_client._jira_instance.jql.return_value = {"issues": [], "total": 142}
+        result = await search_count(mock_client, "project = X")
+        assert result.data == {"jql": "project = X", "total": 142}
+        assert result.count == 1
+        assert result.truncated is False
+
+    async def test_calls_jql_with_limit_zero(self, mock_client: AtlassianClient) -> None:
+        mock_client._jira_instance.jql.return_value = {"issues": [], "total": 0}
+        await search_count(mock_client, "project = X")
+        mock_client._jira_instance.jql.assert_called_once_with("project = X", limit=0, fields=[])

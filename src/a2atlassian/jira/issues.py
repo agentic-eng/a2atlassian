@@ -120,6 +120,21 @@ async def search(
     )
 
 
+async def search_count(client: AtlassianClient, jql: str) -> OperationResult:
+    """Return just the total count for a JQL — cheap pre-check before a broad search."""
+    t0 = time.monotonic()
+    response = await client._call(client._jira.jql, jql, limit=0, fields=[])
+    elapsed = int((time.monotonic() - t0) * 1000)
+    total = response.get("total", 0)
+    return OperationResult(
+        name="search_count",
+        data={"jql": jql, "total": total},
+        count=1,
+        truncated=False,
+        time_ms=elapsed,
+    )
+
+
 async def create_issue(
     client: AtlassianClient,
     project_key: str,
