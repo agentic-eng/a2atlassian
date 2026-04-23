@@ -39,11 +39,16 @@ def _get_connection(connection: str) -> ConnectionInfo:
     if connection in _ephemeral_connections:
         return _ephemeral_connections[connection]
     store = _store()
-    conn = store.load(connection)
+    try:
+        info = store.load(connection)
+    except FileNotFoundError:
+        available = [c.connection for c in store.list_connections()] + list(_ephemeral_connections.keys())
+        raise FileNotFoundError(_enricher.connection_not_found(connection, sorted(set(available)))) from None
     if _scope_filter and connection not in _scope_filter:
-        msg = f"Connection '{connection}' exists but is not in scope. Available: {', '.join(_scope_filter)}"
-        raise FileNotFoundError(msg)
-    return conn
+        all_known = [c.connection for c in store.list_connections()] + list(_ephemeral_connections.keys())
+        in_scope_and_exist = sorted(set(_scope_filter) & set(all_known))
+        raise FileNotFoundError(_enricher.connection_not_found(connection, in_scope_and_exist))
+    return info
 
 
 def _get_client(connection: str) -> AtlassianClient:

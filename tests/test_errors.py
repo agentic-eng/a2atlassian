@@ -33,3 +33,22 @@ class TestErrorEnricher:
     def test_no_enrichment_for_generic_error(self) -> None:
         result = self.enricher.enrich("Something went wrong")
         assert result == "Something went wrong"
+
+
+class TestConnectionNotFound:
+    def test_includes_available_names(self) -> None:
+        enricher = ErrorEnricher()
+        msg = enricher.connection_not_found("protae", ["protea", "foo"])
+        assert "Connection not found: protae" in msg
+        assert "Available connections: foo, protea" in msg or "Available connections: protea, foo" in msg
+
+    def test_did_you_mean(self) -> None:
+        enricher = ErrorEnricher()
+        msg = enricher.connection_not_found("protae", ["protea", "foo"])
+        assert "Did you mean: protea" in msg
+
+    def test_no_available_connections(self) -> None:
+        enricher = ErrorEnricher()
+        msg = enricher.connection_not_found("protea", [])
+        assert "No connections are configured" in msg
+        assert "a2atlassian login" in msg

@@ -274,3 +274,20 @@ class TestToolWrapperExecution:
             kwargs = self._build_kwargs(tool.fn)
             result = await tool.fn(**kwargs)
             assert "read-only" in result, f"{name} did not enforce read-only"
+
+
+class TestConnectionNotFoundEnrichment:
+    def test_message_includes_available_names(self, tmp_path, monkeypatch) -> None:
+        from a2atlassian import mcp_server
+        from a2atlassian.connections import ConnectionStore
+
+        store = ConnectionStore(tmp_path)
+        store.save("protea", "https://p.atlassian.net", "x@y.com", "t")
+        monkeypatch.setattr(mcp_server, "_store", lambda: store)
+
+        with pytest.raises(FileNotFoundError, match="protae") as exc_info:
+            mcp_server._get_connection("protae")
+
+        msg = str(exc_info.value)
+        assert "protea" in msg
+        assert "Did you mean" in msg

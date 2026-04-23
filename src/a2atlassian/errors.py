@@ -101,3 +101,20 @@ class ErrorEnricher:
         """Format an error for an invalid enum value."""
         expected = ", ".join(str(c) for c in choices)
         return f"Invalid value for '{param}': {value!r}. Expected one of: {expected}."
+
+    def connection_not_found(self, name: str, available: list[str]) -> str:
+        """Format a structured 'connection not found' error."""
+        parts = [f"Connection not found: {name}"]
+        if not available:
+            parts.append("")
+            parts.append(
+                "No connections are configured. Run `a2atlassian login -c <name> --url <url> --email <email> --token <token>` to add one."
+            )
+            return "\n".join(parts)
+        parts.append("")
+        parts.append(f"Available connections: {', '.join(sorted(available))}")
+        matches = get_close_matches(name, available, n=1, cutoff=0.5)
+        if matches:
+            parts.append(f"Did you mean: {matches[0]}?")
+        parts.append("Run `a2atlassian connections` to see saved connections, or `a2atlassian login` to add one.")
+        return "\n".join(parts)
