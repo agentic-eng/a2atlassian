@@ -35,7 +35,7 @@ class TestLogin:
     def test_login_help(self, runner: CliRunner) -> None:
         result = runner.invoke(cli, ["login", "--help"])
         assert result.exit_code == 0
-        assert "--project" in result.output or "-p" in result.output
+        assert "--connection" in result.output or "-c" in result.output
 
     @patch("a2atlassian.cli.AtlassianClient")
     def test_login_success(self, mock_client_cls, runner: CliRunner, tmp_path: Path) -> None:
@@ -49,7 +49,7 @@ class TestLogin:
                 cli,
                 [
                     "login",
-                    "-p",
+                    "-c",
                     "test",
                     "--url",
                     "https://test.atlassian.net",
@@ -67,7 +67,7 @@ class TestLogin:
 class TestLogout:
     def test_logout_success(self, runner: CliRunner) -> None:
         with patch("a2atlassian.cli._store"):
-            result = runner.invoke(cli, ["logout", "-p", "test"])
+            result = runner.invoke(cli, ["logout", "-c", "test"])
         assert result.exit_code == 0
         assert "removed" in result.output.lower()
 

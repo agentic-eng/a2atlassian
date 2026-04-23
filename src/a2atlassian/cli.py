@@ -27,14 +27,14 @@ def cli(ctx: click.Context) -> None:
 
 
 @cli.command()
-@click.option("-p", "--project", required=True, help="Project name")
+@click.option("-c", "--connection", required=True, help="Project name")
 @click.option("--url", required=True, help="Atlassian site URL (e.g., https://mysite.atlassian.net)")
 @click.option("--email", required=True, help="Account email")
 @click.option("--token", required=True, help="API token (or ${ENV_VAR} reference)")
 @click.option("--read-only/--no-read-only", default=True, help="Read-only mode (default: true)")
-def login(project: str, url: str, email: str, token: str, read_only: bool) -> None:
+def login(connection: str, url: str, email: str, token: str, read_only: bool) -> None:
     """Save an Atlassian connection. Validates by calling /myself."""
-    info = ConnectionInfo(connection=project, url=url, email=email, token=token, read_only=read_only)
+    info = ConnectionInfo(connection=connection, url=url, email=email, token=token, read_only=read_only)
     client = AtlassianClient(info)
 
     try:
@@ -44,30 +44,30 @@ def login(project: str, url: str, email: str, token: str, read_only: bool) -> No
         sys.exit(1)
 
     store = _store()
-    path = store.save(connection=project, url=url, email=email, token=token, read_only=read_only)
+    path = store.save(connection=connection, url=url, email=email, token=token, read_only=read_only)
     display_name = user.get("displayName", "unknown")
     click.echo(f"Connection saved: {path} (authenticated as {display_name})")
 
 
 @cli.command()
-@click.option("-p", "--project", required=True, help="Project name")
-def logout(project: str) -> None:
+@click.option("-c", "--connection", required=True, help="Project name")
+def logout(connection: str) -> None:
     """Remove a saved connection."""
     store = _store()
     try:
-        store.delete(project)
+        store.delete(connection)
     except FileNotFoundError as exc:
         click.echo(f"Error: {exc}", err=True)
         sys.exit(1)
-    click.echo(f"Connection removed: {project}")
+    click.echo(f"Connection removed: {connection}")
 
 
 @cli.command()
-@click.option("-p", "--project", default=None, help="Filter by project")
-def connections(project: str | None) -> None:
+@click.option("-c", "--connection", default=None, required=False, help="Filter by project")
+def connections(connection: str | None) -> None:
     """List saved connections (no secrets shown)."""
     store = _store()
-    results = store.list_connections(connection=project)
+    results = store.list_connections(connection=connection)
     if not results:
         click.echo("No connections found.")
         return
