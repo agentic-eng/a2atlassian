@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from a2atlassian.formatter import OperationResult
 
 if TYPE_CHECKING:
-    from a2atlassian.client import AtlassianClient
+    from a2atlassian.jira_client import JiraClient
 
 
 def _extract_link_type(raw: dict[str, Any]) -> dict[str, Any]:
@@ -21,7 +21,7 @@ def _extract_link_type(raw: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-async def get_link_types(client: AtlassianClient) -> OperationResult:
+async def get_link_types(client: JiraClient) -> OperationResult:
     """Get all issue link types."""
     t0 = time.monotonic()
     data = await client._call(client._jira.get_issue_link_types)
@@ -45,7 +45,7 @@ async def get_link_types(client: AtlassianClient) -> OperationResult:
 
 
 async def create_issue_link(
-    client: AtlassianClient,
+    client: JiraClient,
     link_type: str,
     inward_key: str,
     outward_key: str,
@@ -76,7 +76,7 @@ async def create_issue_link(
     )
 
 
-async def remove_issue_link(client: AtlassianClient, link_id: str) -> OperationResult:
+async def remove_issue_link(client: JiraClient, link_id: str) -> OperationResult:
     """Remove an issue link by ID."""
     t0 = time.monotonic()
     await client._call(client._jira.remove_issue_link, link_id)

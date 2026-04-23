@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 
-from a2atlassian.client import AtlassianClient
 from a2atlassian.decorators import check_writable, mcp_tool
 from a2atlassian.formatter import OperationResult  # noqa: TC001 — FastMCP needs runtime annotation
 from a2atlassian.jira.projects import create_version, get_project_metadata, get_projects
+from a2atlassian.jira_client import JiraClient
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 def register_read(
     server: FastMCP,
-    get_client: Callable[[str], AtlassianClient],
+    get_client: Callable[[str], JiraClient],
     enricher: ErrorEnricher,
 ) -> None:
     @server.tool()
@@ -63,4 +63,4 @@ def register_write(
         """Create a new version in a Jira project."""
         conn = get_connection(connection)
         check_writable(conn, connection)
-        return await create_version(AtlassianClient(conn), project_key=project_key, name=name)
+        return await create_version(JiraClient(conn), project_key=project_key, name=name)

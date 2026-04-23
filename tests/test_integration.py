@@ -7,17 +7,17 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from a2atlassian.client import AtlassianClient
 from a2atlassian.connections import ConnectionInfo
 from a2atlassian.formatter import format_result
 from a2atlassian.jira.comments import add_comment, edit_comment, get_comments
 from a2atlassian.jira.issues import get_issue, search
 from a2atlassian.jira.transitions import get_transitions, transition_issue
+from a2atlassian.jira_client import JiraClient
 from a2atlassian.mcp_server import _parse_register_args, _parse_scope_args
 
 
 @pytest.fixture
-def mock_jira_client() -> AtlassianClient:
+def mock_jira_client() -> JiraClient:
     conn = ConnectionInfo(
         connection="integration",
         url="https://integration.atlassian.net",
@@ -25,7 +25,7 @@ def mock_jira_client() -> AtlassianClient:
         token="test-token",
         read_only=False,
     )
-    client = AtlassianClient(conn)
+    client = JiraClient(conn)
     client._jira_instance = MagicMock()
     return client
 
@@ -33,7 +33,7 @@ def mock_jira_client() -> AtlassianClient:
 class TestFullWorkflow:
     """Test the secondary critical path: fetch → comment → update comment → transition."""
 
-    async def test_fetch_comment_transition_workflow(self, mock_jira_client: AtlassianClient) -> None:
+    async def test_fetch_comment_transition_workflow(self, mock_jira_client: JiraClient) -> None:
         jira = mock_jira_client._jira_instance
 
         # 1. Get issue
@@ -77,7 +77,7 @@ class TestFullWorkflow:
 
 
 class TestFormatting:
-    async def test_search_toon_format(self, mock_jira_client: AtlassianClient) -> None:
+    async def test_search_toon_format(self, mock_jira_client: JiraClient) -> None:
         mock_jira_client._jira_instance.jql.return_value = {
             "issues": [
                 {"key": "PROJ-1", "fields": {"summary": "First", "status": {"name": "Open"}}},
@@ -93,7 +93,7 @@ class TestFormatting:
         assert "First" in output
         assert "Open" in output
 
-    async def test_get_issue_json_format(self, mock_jira_client: AtlassianClient) -> None:
+    async def test_get_issue_json_format(self, mock_jira_client: JiraClient) -> None:
         mock_jira_client._jira_instance.issue.return_value = {
             "key": "PROJ-1",
             "fields": {"summary": "Test"},

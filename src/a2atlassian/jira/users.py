@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from a2atlassian.formatter import OperationResult
 
 if TYPE_CHECKING:
-    from a2atlassian.client import AtlassianClient
+    from a2atlassian.jira_client import JiraClient
 
 
 def _extract_user(raw: dict[str, Any]) -> dict[str, Any]:
@@ -21,7 +21,7 @@ def _extract_user(raw: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-async def get_user_profile(client: AtlassianClient, account_id: str) -> OperationResult:
+async def get_user_profile(client: JiraClient, account_id: str) -> OperationResult:
     """Get a Jira user profile by account ID."""
     t0 = time.monotonic()
     data = await client._call(client._jira.user, account_id)

@@ -8,9 +8,10 @@ import pytest
 from requests.exceptions import HTTPError
 from requests.models import Response
 
-from a2atlassian.client import AtlassianClient, AtlassianClientBase
+from a2atlassian.client import AtlassianClientBase
 from a2atlassian.connections import ConnectionInfo
 from a2atlassian.errors import AuthenticationError, RateLimitError, ServerError
+from a2atlassian.jira_client import JiraClient
 
 
 @pytest.fixture
@@ -25,21 +26,21 @@ def connection() -> ConnectionInfo:
 
 
 @pytest.fixture
-def client(connection: ConnectionInfo) -> AtlassianClient:
-    c = AtlassianClient(connection)
+def client(connection: ConnectionInfo) -> JiraClient:
+    c = JiraClient(connection)
     c.RETRY_BACKOFF = [0, 0]
     return c
 
 
-class TestAtlassianClient:
-    def test_init(self, client: AtlassianClient) -> None:
+class TestJiraClient:
+    def test_init(self, client: JiraClient) -> None:
         assert client.connection.connection == "test"
 
     @patch("a2atlassian.jira_client._lazy_jira")
     async def test_jira_property_creates_instance(self, mock_lazy: MagicMock, connection: ConnectionInfo) -> None:
         mock_jira_cls = MagicMock()
         mock_lazy.return_value = mock_jira_cls
-        client = AtlassianClient(connection)
+        client = JiraClient(connection)
         _ = client._jira
         mock_jira_cls.assert_called_once_with(
             url="https://test.atlassian.net",
@@ -52,18 +53,18 @@ class TestAtlassianClient:
     async def test_jira_cached(self, mock_lazy: MagicMock, connection: ConnectionInfo) -> None:
         mock_jira_cls = MagicMock()
         mock_lazy.return_value = mock_jira_cls
-        client = AtlassianClient(connection)
+        client = JiraClient(connection)
         _ = client._jira
         _ = client._jira
         mock_jira_cls.assert_called_once()
 
-    async def test_call_async_wraps_sync(self, client: AtlassianClient) -> None:
+    async def test_call_async_wraps_sync(self, client: JiraClient) -> None:
         mock_fn = MagicMock(return_value={"key": "TEST-1"})
         result = await client._call(mock_fn, "arg1", kwarg1="val1")
         mock_fn.assert_called_once_with("arg1", kwarg1="val1")
         assert result == {"key": "TEST-1"}
 
-    async def test_retry_on_rate_limit(self, client: AtlassianClient) -> None:
+    async def test_retry_on_rate_limit(self, client: JiraClient) -> None:
         from requests.exceptions import HTTPError
 
         response = MagicMock()
@@ -76,7 +77,7 @@ class TestAtlassianClient:
         assert result == {"ok": True}
         assert mock_fn.call_count == 3
 
-    async def test_retry_on_server_error(self, client: AtlassianClient) -> None:
+    async def test_retry_on_server_error(self, client: JiraClient) -> None:
         from requests.exceptions import HTTPError
 
         response = MagicMock()
@@ -88,7 +89,7 @@ class TestAtlassianClient:
             result = await client._call(mock_fn)
         assert result == {"ok": True}
 
-    async def test_auth_error_no_retry(self, client: AtlassianClient) -> None:
+    async def test_auth_error_no_retry(self, client: JiraClient) -> None:
         from requests.exceptions import HTTPError
 
         response = MagicMock()
@@ -100,7 +101,7 @@ class TestAtlassianClient:
             await client._call(mock_fn)
         assert mock_fn.call_count == 1
 
-    async def test_max_retries_exceeded(self, client: AtlassianClient) -> None:
+    async def test_max_retries_exceeded(self, client: JiraClient) -> None:
         from requests.exceptions import HTTPError
 
         response = MagicMock()

@@ -6,14 +6,14 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from a2atlassian.client import AtlassianClient
 from a2atlassian.connections import ConnectionInfo
 from a2atlassian.formatter import OperationResult
 from a2atlassian.jira.boards import get_board_issues, get_boards
+from a2atlassian.jira_client import JiraClient
 
 
 @pytest.fixture
-def mock_client() -> AtlassianClient:
+def mock_client() -> JiraClient:
     conn = ConnectionInfo(
         connection="test",
         url="https://test.atlassian.net",
@@ -21,13 +21,13 @@ def mock_client() -> AtlassianClient:
         token="tok",
         read_only=True,
     )
-    client = AtlassianClient(conn)
+    client = JiraClient(conn)
     client._jira_instance = MagicMock()
     return client
 
 
 class TestGetBoards:
-    async def test_returns_boards_from_values(self, mock_client: AtlassianClient) -> None:
+    async def test_returns_boards_from_values(self, mock_client: JiraClient) -> None:
         """boards() returns {"values": [...]} dict."""
         mock_client._jira_instance.get_all_agile_boards.return_value = {
             "values": [
@@ -45,7 +45,7 @@ class TestGetBoards:
         assert result.data[1]["id"] == "2"
         assert result.data[1]["type"] == "kanban"
 
-    async def test_returns_boards_from_list(self, mock_client: AtlassianClient) -> None:
+    async def test_returns_boards_from_list(self, mock_client: JiraClient) -> None:
         """boards() may return a plain list."""
         mock_client._jira_instance.get_all_agile_boards.return_value = [
             {"id": 10, "name": "Board X", "type": "scrum", "location": {"projectKey": "X"}},
@@ -55,7 +55,7 @@ class TestGetBoards:
         assert result.data[0]["id"] == "10"
         assert result.data[0]["name"] == "Board X"
 
-    async def test_handles_dict_type(self, mock_client: AtlassianClient) -> None:
+    async def test_handles_dict_type(self, mock_client: JiraClient) -> None:
         """type can be a dict with a name key."""
         mock_client._jira_instance.get_all_agile_boards.return_value = {
             "values": [
@@ -65,7 +65,7 @@ class TestGetBoards:
         result = await get_boards(mock_client)
         assert result.data[0]["type"] == "kanban"
 
-    async def test_handles_missing_location(self, mock_client: AtlassianClient) -> None:
+    async def test_handles_missing_location(self, mock_client: JiraClient) -> None:
         """location may be absent."""
         mock_client._jira_instance.get_all_agile_boards.return_value = {
             "values": [
@@ -75,7 +75,7 @@ class TestGetBoards:
         result = await get_boards(mock_client)
         assert result.data[0]["project_key"] == ""
 
-    async def test_handles_string_location(self, mock_client: AtlassianClient) -> None:
+    async def test_handles_string_location(self, mock_client: JiraClient) -> None:
         """atlassian-python-api may transform location to a string."""
         mock_client._jira_instance.get_all_agile_boards.return_value = {
             "values": [
@@ -85,7 +85,7 @@ class TestGetBoards:
         result = await get_boards(mock_client)
         assert result.data[0]["project_key"] == "PROJ"
 
-    async def test_empty_boards(self, mock_client: AtlassianClient) -> None:
+    async def test_empty_boards(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.get_all_agile_boards.return_value = {"values": []}
         result = await get_boards(mock_client)
         assert result.count == 0
@@ -93,7 +93,7 @@ class TestGetBoards:
 
 
 class TestGetBoardIssues:
-    async def test_returns_issues(self, mock_client: AtlassianClient) -> None:
+    async def test_returns_issues(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.get_issues_for_board.return_value = {
             "issues": [
                 {"key": "PROJ-1", "fields": {"summary": "First", "status": {"name": "Open"}}},
@@ -107,12 +107,12 @@ class TestGetBoardIssues:
         assert result.data[0]["key"] == "PROJ-1"
         assert result.data[1]["key"] == "PROJ-2"
 
-    async def test_pagination_params(self, mock_client: AtlassianClient) -> None:
+    async def test_pagination_params(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.get_issues_for_board.return_value = {"issues": [], "total": 0}
         await get_board_issues(mock_client, board_id=1, limit=25, offset=10)
         mock_client._jira_instance.get_issues_for_board.assert_called_once_with(1, startAt=10, maxResults=25)
 
-    async def test_truncation_flag(self, mock_client: AtlassianClient) -> None:
+    async def test_truncation_flag(self, mock_client: JiraClient) -> None:
         issues = [{"key": f"PROJ-{i}", "fields": {"summary": f"Issue {i}"}} for i in range(50)]
         mock_client._jira_instance.get_issues_for_board.return_value = {
             "issues": issues,

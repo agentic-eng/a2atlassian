@@ -6,7 +6,6 @@ from datetime import date as date_cls
 from typing import TYPE_CHECKING, Literal
 from zoneinfo import ZoneInfo
 
-from a2atlassian.client import AtlassianClient
 from a2atlassian.decorators import check_writable, mcp_tool
 from a2atlassian.formatter import OperationResult
 from a2atlassian.jira.worklogs import (
@@ -15,6 +14,7 @@ from a2atlassian.jira.worklogs import (
     get_worklogs,
     get_worklogs_summary,
 )
+from a2atlassian.jira_client import JiraClient
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -55,7 +55,7 @@ def _filter_raw_by_date(
 
 def register_read(
     server: FastMCP,
-    get_client: Callable[[str], AtlassianClient],
+    get_client: Callable[[str], JiraClient],
     enricher: ErrorEnricher,
 ) -> None:
     @server.tool()
@@ -132,4 +132,4 @@ def register_write(
         """Add a worklog entry to a Jira issue. time_spent is a string like '2h 30m'."""
         conn = get_connection(connection)
         check_writable(conn, connection)
-        return await add_worklog(AtlassianClient(conn), issue_key, time_spent, comment=comment)
+        return await add_worklog(JiraClient(conn), issue_key, time_spent, comment=comment)

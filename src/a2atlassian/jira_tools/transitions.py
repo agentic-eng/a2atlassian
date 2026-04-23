@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal
 
-from a2atlassian.client import AtlassianClient
 from a2atlassian.decorators import check_writable, mcp_tool
 from a2atlassian.formatter import OperationResult  # noqa: TC001 — FastMCP needs runtime annotation
 from a2atlassian.jira.transitions import get_transitions, transition_issue
+from a2atlassian.jira_client import JiraClient
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 def register_read(
     server: FastMCP,
-    get_client: Callable[[str], AtlassianClient],
+    get_client: Callable[[str], JiraClient],
     enricher: ErrorEnricher,
 ) -> None:
     @server.tool()
@@ -53,4 +53,4 @@ def register_write(
         """Transition a Jira issue to a new status. Use jira_get_transitions to discover available transitions."""
         conn = get_connection(connection)
         check_writable(conn, connection)
-        return await transition_issue(AtlassianClient(conn), issue_key, transition_id)
+        return await transition_issue(JiraClient(conn), issue_key, transition_id)

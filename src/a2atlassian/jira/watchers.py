@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from a2atlassian.formatter import OperationResult
 
 if TYPE_CHECKING:
-    from a2atlassian.client import AtlassianClient
+    from a2atlassian.jira_client import JiraClient
 
 
 def _extract_watcher(raw: dict[str, Any]) -> dict[str, Any]:
@@ -19,7 +19,7 @@ def _extract_watcher(raw: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-async def get_watchers(client: AtlassianClient, issue_key: str) -> OperationResult:
+async def get_watchers(client: JiraClient, issue_key: str) -> OperationResult:
     """Get watchers for a Jira issue."""
     t0 = time.monotonic()
     data = await client._call(client._jira.issue_get_watchers, issue_key)
@@ -43,7 +43,7 @@ async def get_watchers(client: AtlassianClient, issue_key: str) -> OperationResu
 
 
 async def set_watchers(
-    client: AtlassianClient,
+    client: JiraClient,
     issue_key: str,
     add: list[str] | None = None,
     remove: list[str] | None = None,

@@ -6,14 +6,14 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from a2atlassian.client import AtlassianClient
 from a2atlassian.connections import ConnectionInfo
 from a2atlassian.formatter import OperationResult
 from a2atlassian.jira.comments import add_comment, edit_comment, get_comments
+from a2atlassian.jira_client import JiraClient
 
 
 @pytest.fixture
-def mock_client() -> AtlassianClient:
+def mock_client() -> JiraClient:
     conn = ConnectionInfo(
         connection="test",
         url="https://test.atlassian.net",
@@ -21,13 +21,13 @@ def mock_client() -> AtlassianClient:
         token="tok",
         read_only=False,
     )
-    client = AtlassianClient(conn)
+    client = JiraClient(conn)
     client._jira_instance = MagicMock()
     return client
 
 
 class TestGetComments:
-    async def test_returns_comments(self, mock_client: AtlassianClient) -> None:
+    async def test_returns_comments(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.issue_get_comments.return_value = {
             "comments": [
                 {"id": "1", "body": "First comment", "author": {"displayName": "Alice"}, "created": "2026-01-01"},
@@ -42,7 +42,7 @@ class TestGetComments:
         assert result.data[0]["author"] == "Alice"
         assert result.data[0]["body"] == "First comment"
 
-    async def test_empty_comments(self, mock_client: AtlassianClient) -> None:
+    async def test_empty_comments(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.issue_get_comments.return_value = {
             "comments": [],
             "total": 0,
@@ -50,7 +50,7 @@ class TestGetComments:
         result = await get_comments(mock_client, "PROJ-1")
         assert result.count == 0
 
-    async def test_adf_body_extraction(self, mock_client: AtlassianClient) -> None:
+    async def test_adf_body_extraction(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.issue_get_comments.return_value = {
             "comments": [
                 {
@@ -71,7 +71,7 @@ class TestGetComments:
 
 
 class TestAddComment:
-    async def test_add_comment(self, mock_client: AtlassianClient) -> None:
+    async def test_add_comment(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.issue_add_comment.return_value = {
             "id": "123",
             "body": "New comment",
@@ -85,7 +85,7 @@ class TestAddComment:
 
 
 class TestEditComment:
-    async def test_edit_comment(self, mock_client: AtlassianClient) -> None:
+    async def test_edit_comment(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.issue_edit_comment.return_value = {
             "id": "123",
             "body": "Updated comment",

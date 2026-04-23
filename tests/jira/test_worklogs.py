@@ -8,17 +8,17 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from a2atlassian.client import AtlassianClient
 from a2atlassian.connections import ConnectionInfo
 from a2atlassian.errors import ErrorEnricher
 from a2atlassian.formatter import OperationResult
 from a2atlassian.jira.worklogs import add_worklog, get_worklogs, get_worklogs_summary
+from a2atlassian.jira_client import JiraClient
 
 FIXTURES = Path(__file__).parent.parent / "fixtures"
 
 
 @pytest.fixture
-def mock_client() -> AtlassianClient:
+def mock_client() -> JiraClient:
     conn = ConnectionInfo(
         connection="test",
         url="https://test.atlassian.net",
@@ -26,13 +26,13 @@ def mock_client() -> AtlassianClient:
         token="tok",
         read_only=False,
     )
-    client = AtlassianClient(conn)
+    client = JiraClient(conn)
     client._jira_instance = MagicMock()
     return client
 
 
 class TestGetWorklogs:
-    async def test_returns_worklogs_from_dict(self, mock_client: AtlassianClient) -> None:
+    async def test_returns_worklogs_from_dict(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.issue_get_worklog.return_value = {
             "worklogs": [
                 {
@@ -60,7 +60,7 @@ class TestGetWorklogs:
         assert result.data[0]["comment"] == "Working on feature"
         assert result.data[1]["time_spent"] == "1h 30m"
 
-    async def test_returns_worklogs_from_list(self, mock_client: AtlassianClient) -> None:
+    async def test_returns_worklogs_from_list(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.issue_get_worklog.return_value = [
             {"id": "100", "author": {"displayName": "Alice"}, "timeSpent": "1h"},
         ]
@@ -68,7 +68,7 @@ class TestGetWorklogs:
         assert result.count == 1
         assert result.data[0]["author"] == "Alice"
 
-    async def test_handles_adf_comment(self, mock_client: AtlassianClient) -> None:
+    async def test_handles_adf_comment(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.issue_get_worklog.return_value = {
             "worklogs": [
                 {
@@ -87,7 +87,7 @@ class TestGetWorklogs:
         result = await get_worklogs(mock_client, "PROJ-1")
         assert result.data[0]["comment"] == "ADF comment"
 
-    async def test_empty_worklogs(self, mock_client: AtlassianClient) -> None:
+    async def test_empty_worklogs(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.issue_get_worklog.return_value = {"worklogs": []}
         result = await get_worklogs(mock_client, "PROJ-1")
         assert result.count == 0
@@ -95,7 +95,7 @@ class TestGetWorklogs:
 
 
 class TestAddWorklog:
-    async def test_adds_worklog_with_response(self, mock_client: AtlassianClient) -> None:
+    async def test_adds_worklog_with_response(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.issue_worklog.return_value = {
             "id": "200",
             "author": {"displayName": "Alice"},
@@ -110,14 +110,14 @@ class TestAddWorklog:
         assert result.data["comment"] == "Completed task"
         mock_client._jira_instance.issue_worklog.assert_called_once_with("PROJ-1", comment="Completed task", timeSpent="2h 30m")
 
-    async def test_adds_worklog_with_none_response(self, mock_client: AtlassianClient) -> None:
+    async def test_adds_worklog_with_none_response(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.issue_worklog.return_value = None
         result = await add_worklog(mock_client, "PROJ-1", "1h")
         assert result.data["issue_key"] == "PROJ-1"
         assert result.data["time_spent"] == "1h"
         assert result.data["status"] == "added"
 
-    async def test_adds_worklog_without_comment(self, mock_client: AtlassianClient) -> None:
+    async def test_adds_worklog_without_comment(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.issue_worklog.return_value = None
         await add_worklog(mock_client, "PROJ-1", "3h")
         mock_client._jira_instance.issue_worklog.assert_called_once_with("PROJ-1", timeSpent="3h", comment=None)
@@ -125,7 +125,7 @@ class TestAddWorklog:
 
 class TestGetWorklogsSummary:
     @pytest.fixture
-    def mock_proxy_client(self) -> AtlassianClient:
+    def mock_proxy_client(self) -> JiraClient:
         """Client wired so jql returns the proxy-logged ticket and issue_get_worklog returns three worklogs."""
         fixture = json.loads((FIXTURES / "jira_worklogs_proxy.json").read_text())
         conn = ConnectionInfo(
@@ -136,7 +136,7 @@ class TestGetWorklogsSummary:
             worklog_admins=("denis@example.com",),
             timezone="Europe/Istanbul",
         )
-        client = AtlassianClient(conn)
+        client = JiraClient(conn)
         client._jira_instance = MagicMock()
         client._jira_instance.jql.return_value = {
             "issues": [
@@ -156,7 +156,7 @@ class TestGetWorklogsSummary:
         client._jira_instance.issue_get_worklog.return_value = {"worklogs": fixture["worklogs"]}
         return client
 
-    async def test_self_logged_hours_go_to_assignee(self, mock_proxy_client: AtlassianClient) -> None:
+    async def test_self_logged_hours_go_to_assignee(self, mock_proxy_client: JiraClient) -> None:
         """Alice logged 4h against PE0-42 (self) on 2026-04-22 -> 4h to Alice, source='self'."""
         result = await get_worklogs_summary(
             mock_proxy_client,
@@ -169,7 +169,7 @@ class TestGetWorklogsSummary:
         assert alice_self[0]["hours"] == 4.0
         assert alice_self[0]["key"] == "PE0-42"
 
-    async def test_admin_proxy_goes_to_assignee(self, mock_proxy_client: AtlassianClient) -> None:
+    async def test_admin_proxy_goes_to_assignee(self, mock_proxy_client: JiraClient) -> None:
         """Denis (admin) logged 1h against Alice's ticket -> 1h to Alice, source='proxy:Denis'."""
         result = await get_worklogs_summary(
             mock_proxy_client,
@@ -182,7 +182,7 @@ class TestGetWorklogsSummary:
         assert proxy_rows[0]["hours"] == 1.0
         assert proxy_rows[0]["source"] == "proxy:Denis"
 
-    async def test_non_admin_other_goes_to_logger(self, mock_proxy_client: AtlassianClient) -> None:
+    async def test_non_admin_other_goes_to_logger(self, mock_proxy_client: JiraClient) -> None:
         """Bob (not admin) logged 2h against Alice's ticket -> 2h to Bob, source='non-admin-other'."""
         result = await get_worklogs_summary(
             mock_proxy_client,
@@ -196,7 +196,7 @@ class TestGetWorklogsSummary:
         assert bob_rows[0]["source"] == "non-admin-other"
         assert bob_rows[0]["key"] == "PE0-42"
 
-    async def test_total_detail_aggregates(self, mock_proxy_client: AtlassianClient) -> None:
+    async def test_total_detail_aggregates(self, mock_proxy_client: JiraClient) -> None:
         result = await get_worklogs_summary(
             mock_proxy_client,
             date_from="2026-04-22",
@@ -205,7 +205,7 @@ class TestGetWorklogsSummary:
         rows = {r["person"]: r["total_hours"] for r in result.data}
         assert rows == {"Alice": 5.0, "Bob": 2.0}
 
-    async def test_by_day_detail(self, mock_proxy_client: AtlassianClient) -> None:
+    async def test_by_day_detail(self, mock_proxy_client: JiraClient) -> None:
         result = await get_worklogs_summary(
             mock_proxy_client,
             date_from="2026-04-22",
@@ -217,7 +217,7 @@ class TestGetWorklogsSummary:
         assert alice[0]["date"] == "2026-04-22"
         assert alice[0]["hours"] == 5.0
 
-    async def test_tz_boundary(self, mock_proxy_client: AtlassianClient) -> None:
+    async def test_tz_boundary(self, mock_proxy_client: JiraClient) -> None:
         """A worklog at 23:30 UTC on 2026-04-22 is at 02:30 Istanbul on 2026-04-23 -- must land on 04-23."""
         mock_proxy_client._jira_instance.issue_get_worklog.return_value = {
             "worklogs": [
@@ -244,8 +244,8 @@ class TestTwoModeToolLogic:
     """Unit tests for the two-mode jira_get_worklogs MCP tool dispatch logic."""
 
     @pytest.fixture
-    def real_client(self) -> AtlassianClient:
-        """A real AtlassianClient with a mocked _jira_instance."""
+    def real_client(self) -> JiraClient:
+        """A real JiraClient with a mocked _jira_instance."""
         conn = ConnectionInfo(
             connection="test",
             url="https://test.atlassian.net",
@@ -254,7 +254,7 @@ class TestTwoModeToolLogic:
             read_only=False,
             timezone="UTC",
         )
-        client = AtlassianClient(conn)
+        client = JiraClient(conn)
         client._jira_instance = MagicMock()
         return client
 
@@ -340,7 +340,7 @@ class TestWorklogsPagination:
             worklog_admins=(),
             timezone="UTC",
         )
-        client = AtlassianClient(conn)
+        client = JiraClient(conn)
         client._jira_instance = MagicMock()
         client._jira_instance.jql.return_value = None  # non-dict response
 
@@ -359,7 +359,7 @@ class TestWorklogsPagination:
             worklog_admins=(),
             timezone="UTC",
         )
-        client = AtlassianClient(conn)
+        client = JiraClient(conn)
         client._jira_instance = MagicMock()
 
         page1 = {

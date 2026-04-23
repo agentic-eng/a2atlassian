@@ -6,14 +6,14 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from a2atlassian.client import AtlassianClient
 from a2atlassian.connections import ConnectionInfo
 from a2atlassian.formatter import OperationResult
 from a2atlassian.jira.users import get_user_profile
+from a2atlassian.jira_client import JiraClient
 
 
 @pytest.fixture
-def mock_client() -> AtlassianClient:
+def mock_client() -> JiraClient:
     conn = ConnectionInfo(
         connection="test",
         url="https://test.atlassian.net",
@@ -21,13 +21,13 @@ def mock_client() -> AtlassianClient:
         token="tok",
         read_only=True,
     )
-    client = AtlassianClient(conn)
+    client = JiraClient(conn)
     client._jira_instance = MagicMock()
     return client
 
 
 class TestGetUserProfile:
-    async def test_returns_user_profile(self, mock_client: AtlassianClient) -> None:
+    async def test_returns_user_profile(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.user.return_value = {
             "accountId": "5b10a2844c20165700ede21g",
             "displayName": "Alice Smith",
@@ -43,7 +43,7 @@ class TestGetUserProfile:
         assert result.count == 1
         mock_client._jira_instance.user.assert_called_once_with("5b10a2844c20165700ede21g")
 
-    async def test_handles_missing_email(self, mock_client: AtlassianClient) -> None:
+    async def test_handles_missing_email(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.user.return_value = {
             "accountId": "5b10a2844c20165700ede21g",
             "displayName": "Bot User",
@@ -52,7 +52,7 @@ class TestGetUserProfile:
         result = await get_user_profile(mock_client, "5b10a2844c20165700ede21g")
         assert result.data["email"] == ""
 
-    async def test_handles_inactive_user(self, mock_client: AtlassianClient) -> None:
+    async def test_handles_inactive_user(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.user.return_value = {
             "accountId": "5b10a2844c20165700ede21g",
             "displayName": "Former User",
@@ -62,7 +62,7 @@ class TestGetUserProfile:
         result = await get_user_profile(mock_client, "5b10a2844c20165700ede21g")
         assert result.data["active"] is False
 
-    async def test_handles_missing_fields(self, mock_client: AtlassianClient) -> None:
+    async def test_handles_missing_fields(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.user.return_value = {}
         result = await get_user_profile(mock_client, "unknown")
         assert result.data["account_id"] == ""

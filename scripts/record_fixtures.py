@@ -28,8 +28,8 @@ from typing import Any
 # Add src to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from a2atlassian.client import AtlassianClient
 from a2atlassian.connections import ConnectionInfo
+from a2atlassian.jira_client import JiraClient
 
 
 def _env(name: str) -> str:
@@ -145,7 +145,7 @@ async def _record(
         print(f"  FAIL {filename}: {exc}")
 
 
-async def _record_issue_fixtures(client: AtlassianClient, output_dir: Path, url: str, issue_key: str) -> None:
+async def _record_issue_fixtures(client: JiraClient, output_dir: Path, url: str, issue_key: str) -> None:
     r = lambda f, m, a, c: _record(output_dir, url, f, m, a, c)  # noqa: E731
     await r("jira_issue.json", "client._jira.issue", [issue_key], client._call(client._jira.issue, issue_key))
     await r(
@@ -174,7 +174,7 @@ async def _record_issue_fixtures(client: AtlassianClient, output_dir: Path, url:
     )
 
 
-async def _record_project_fixtures(client: AtlassianClient, output_dir: Path, url: str, project: str) -> None:
+async def _record_project_fixtures(client: JiraClient, output_dir: Path, url: str, project: str) -> None:
     r = lambda f, m, a, c: _record(output_dir, url, f, m, a, c)  # noqa: E731
     await r(
         "jira_search.json",
@@ -197,7 +197,7 @@ async def _record_project_fixtures(client: AtlassianClient, output_dir: Path, ur
     )
 
 
-async def _record_create_issue(client: AtlassianClient, output_dir: Path, url: str, project: str) -> None:
+async def _record_create_issue(client: JiraClient, output_dir: Path, url: str, project: str) -> None:
     """Create a temporary issue, record the response, then delete it."""
     try:
         data = await client._call(
@@ -237,7 +237,7 @@ async def record_all() -> None:
         sys.exit(1)
 
     conn = ConnectionInfo(connection="recorder", url=url, email=email, token=token, read_only=True)
-    client = AtlassianClient(conn)
+    client = JiraClient(conn)
 
     output_dir = Path(__file__).parent.parent / "tests" / "fixtures"
     output_dir.mkdir(parents=True, exist_ok=True)

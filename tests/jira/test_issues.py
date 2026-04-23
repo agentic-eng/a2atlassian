@@ -6,14 +6,14 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from a2atlassian.client import AtlassianClient
 from a2atlassian.connections import ConnectionInfo
 from a2atlassian.formatter import OperationResult
 from a2atlassian.jira.issues import create_issue, delete_issue, get_issue, search, search_count, update_issue
+from a2atlassian.jira_client import JiraClient
 
 
 @pytest.fixture
-def mock_client() -> AtlassianClient:
+def mock_client() -> JiraClient:
     conn = ConnectionInfo(
         connection="test",
         url="https://test.atlassian.net",
@@ -21,13 +21,13 @@ def mock_client() -> AtlassianClient:
         token="tok",
         read_only=True,
     )
-    client = AtlassianClient(conn)
+    client = JiraClient(conn)
     client._jira_instance = MagicMock()
     return client
 
 
 class TestGetIssue:
-    async def test_returns_operation_result(self, mock_client: AtlassianClient) -> None:
+    async def test_returns_operation_result(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.issue.return_value = {
             "key": "PROJ-1",
             "fields": {
@@ -52,12 +52,12 @@ class TestGetIssue:
         assert result.truncated is False
         assert result.time_ms >= 0
 
-    async def test_passes_issue_key(self, mock_client: AtlassianClient) -> None:
+    async def test_passes_issue_key(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.issue.return_value = {"key": "PROJ-1", "fields": {}}
         await get_issue(mock_client, "PROJ-1")
         mock_client._jira_instance.issue.assert_called_once_with("PROJ-1")
 
-    async def test_handles_null_fields(self, mock_client: AtlassianClient) -> None:
+    async def test_handles_null_fields(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.issue.return_value = {
             "key": "PROJ-1",
             "fields": {
@@ -74,7 +74,7 @@ class TestGetIssue:
 
 
 class TestSearch:
-    async def test_returns_list_result(self, mock_client: AtlassianClient) -> None:
+    async def test_returns_list_result(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.jql.return_value = {
             "issues": [
                 {"key": "PROJ-1", "fields": {"summary": "First", "status": {"name": "Open"}}},
@@ -90,7 +90,7 @@ class TestSearch:
         assert result.data[0]["summary"] == "First"
         assert result.data[0]["status"] == "Open"
 
-    async def test_truncation_flag(self, mock_client: AtlassianClient) -> None:
+    async def test_truncation_flag(self, mock_client: JiraClient) -> None:
         issues = [{"key": f"PROJ-{i}", "fields": {"summary": f"Issue {i}"}} for i in range(50)]
         mock_client._jira_instance.jql.return_value = {
             "issues": issues,
@@ -99,7 +99,7 @@ class TestSearch:
         result = await search(mock_client, "project = PROJ", limit=50)
         assert result.truncated is True
 
-    async def test_pagination_params(self, mock_client: AtlassianClient) -> None:
+    async def test_pagination_params(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.jql.return_value = {"issues": [], "total": 0}
         await search(mock_client, "project = PROJ", limit=25, offset=10)
         mock_client._jira_instance.jql.assert_called_once_with(
@@ -109,21 +109,21 @@ class TestSearch:
             fields=["summary", "status", "assignee", "priority", "issuetype", "parent", "updated"],
         )
 
-    async def test_default_fields_is_minimal(self, mock_client: AtlassianClient) -> None:
+    async def test_default_fields_is_minimal(self, mock_client: JiraClient) -> None:
         """search() with no fields param passes the minimal default set."""
         mock_client._jira_instance.jql.return_value = {"issues": [], "total": 0}
         await search(mock_client, "project = X")
         call_kwargs = mock_client._jira_instance.jql.call_args.kwargs
         assert call_kwargs["fields"] == ["summary", "status", "assignee", "priority", "issuetype", "parent", "updated"]
 
-    async def test_all_fields_sentinel_omits_fields(self, mock_client: AtlassianClient) -> None:
+    async def test_all_fields_sentinel_omits_fields(self, mock_client: JiraClient) -> None:
         """fields=['*all'] passes no fields kwarg (returns everything)."""
         mock_client._jira_instance.jql.return_value = {"issues": [], "total": 0}
         await search(mock_client, "project = X", fields=["*all"])
         call_kwargs = mock_client._jira_instance.jql.call_args.kwargs
         assert "fields" not in call_kwargs
 
-    async def test_explicit_fields_passed_through(self, mock_client: AtlassianClient) -> None:
+    async def test_explicit_fields_passed_through(self, mock_client: JiraClient) -> None:
         """Explicit fields list is forwarded verbatim."""
         mock_client._jira_instance.jql.return_value = {"issues": [], "total": 0}
         await search(mock_client, "project = X", fields=["summary", "comment"])
@@ -132,7 +132,7 @@ class TestSearch:
 
 
 class TestCreateIssue:
-    async def test_creates_issue(self, mock_client: AtlassianClient) -> None:
+    async def test_creates_issue(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.create_issue.return_value = {
             "id": "10001",
             "key": "PROJ-42",
@@ -152,7 +152,7 @@ class TestCreateIssue:
             }
         )
 
-    async def test_creates_issue_with_description(self, mock_client: AtlassianClient) -> None:
+    async def test_creates_issue_with_description(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.create_issue.return_value = {
             "id": "10002",
             "key": "PROJ-43",
@@ -162,7 +162,7 @@ class TestCreateIssue:
         call_fields = mock_client._jira_instance.create_issue.call_args[1]["fields"]
         assert call_fields["description"] == "Details here"
 
-    async def test_creates_issue_with_extra_fields(self, mock_client: AtlassianClient) -> None:
+    async def test_creates_issue_with_extra_fields(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.create_issue.return_value = {
             "id": "10003",
             "key": "PROJ-44",
@@ -174,7 +174,7 @@ class TestCreateIssue:
         assert call_fields["priority"] == {"name": "High"}
         assert call_fields["labels"] == ["urgent"]
 
-    async def test_handles_int_id(self, mock_client: AtlassianClient) -> None:
+    async def test_handles_int_id(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.create_issue.return_value = {
             "id": 10004,
             "key": "PROJ-45",
@@ -184,7 +184,7 @@ class TestCreateIssue:
 
 
 class TestUpdateIssue:
-    async def test_updates_issue(self, mock_client: AtlassianClient) -> None:
+    async def test_updates_issue(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.update_issue_field.return_value = None
         result = await update_issue(mock_client, "PROJ-1", {"summary": "Updated"})
         assert isinstance(result, OperationResult)
@@ -194,7 +194,7 @@ class TestUpdateIssue:
 
 
 class TestDeleteIssue:
-    async def test_deletes_issue(self, mock_client: AtlassianClient) -> None:
+    async def test_deletes_issue(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.delete_issue.return_value = None
         result = await delete_issue(mock_client, "PROJ-1")
         assert isinstance(result, OperationResult)
@@ -204,14 +204,14 @@ class TestDeleteIssue:
 
 
 class TestSearchCount:
-    async def test_returns_total(self, mock_client: AtlassianClient) -> None:
+    async def test_returns_total(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.jql.return_value = {"issues": [], "total": 142}
         result = await search_count(mock_client, "project = X")
         assert result.data == {"jql": "project = X", "total": 142}
         assert result.count == 1
         assert result.truncated is False
 
-    async def test_calls_jql_with_limit_zero(self, mock_client: AtlassianClient) -> None:
+    async def test_calls_jql_with_limit_zero(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.jql.return_value = {"issues": [], "total": 0}
         await search_count(mock_client, "project = X")
         mock_client._jira_instance.jql.assert_called_once_with("project = X", limit=0, fields=[])

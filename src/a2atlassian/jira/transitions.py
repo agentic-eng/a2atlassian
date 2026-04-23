@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from a2atlassian.formatter import OperationResult
 
 if TYPE_CHECKING:
-    from a2atlassian.client import AtlassianClient
+    from a2atlassian.jira_client import JiraClient
 
 
 def _extract_transition(raw: dict[str, Any]) -> dict[str, Any]:
@@ -27,7 +27,7 @@ def _extract_transition(raw: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-async def get_transitions(client: AtlassianClient, issue_key: str) -> OperationResult:
+async def get_transitions(client: JiraClient, issue_key: str) -> OperationResult:
     """Get available transitions for a Jira issue."""
     t0 = time.monotonic()
     transitions = await client._call(client._jira.get_issue_transitions, issue_key)
@@ -43,7 +43,7 @@ async def get_transitions(client: AtlassianClient, issue_key: str) -> OperationR
 
 
 async def transition_issue(
-    client: AtlassianClient,
+    client: JiraClient,
     issue_key: str,
     transition_id: str,
 ) -> OperationResult:

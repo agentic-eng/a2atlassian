@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from a2atlassian.formatter import OperationResult
 
 if TYPE_CHECKING:
-    from a2atlassian.client import AtlassianClient
+    from a2atlassian.jira_client import JiraClient
 
 
 def _extract_field(raw: dict[str, Any]) -> dict[str, Any]:
@@ -35,7 +35,7 @@ def _extract_option(raw: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-async def search_fields(client: AtlassianClient) -> OperationResult:
+async def search_fields(client: JiraClient) -> OperationResult:
     """List all Jira fields (system and custom)."""
     t0 = time.monotonic()
     data = await client._call(client._jira.get_all_fields)
@@ -52,7 +52,7 @@ async def search_fields(client: AtlassianClient) -> OperationResult:
     )
 
 
-async def get_field_options(client: AtlassianClient, field_id: str) -> OperationResult:
+async def get_field_options(client: JiraClient, field_id: str) -> OperationResult:
     """Get options for a custom field."""
     t0 = time.monotonic()
     data = await client._call(client._jira.get_custom_field_option, field_id)

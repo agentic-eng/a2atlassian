@@ -6,7 +6,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from a2atlassian.client import AtlassianClient
 from a2atlassian.connections import ConnectionInfo
 from a2atlassian.formatter import OperationResult
 from a2atlassian.jira.projects import (
@@ -16,10 +15,11 @@ from a2atlassian.jira.projects import (
     get_project_versions,
     get_projects,
 )
+from a2atlassian.jira_client import JiraClient
 
 
 @pytest.fixture
-def mock_client() -> AtlassianClient:
+def mock_client() -> JiraClient:
     conn = ConnectionInfo(
         connection="test",
         url="https://test.atlassian.net",
@@ -27,13 +27,13 @@ def mock_client() -> AtlassianClient:
         token="tok",
         read_only=False,
     )
-    client = AtlassianClient(conn)
+    client = JiraClient(conn)
     client._jira_instance = MagicMock()
     return client
 
 
 class TestGetProjects:
-    async def test_returns_projects(self, mock_client: AtlassianClient) -> None:
+    async def test_returns_projects(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.projects.return_value = [
             {
                 "key": "PROJ",
@@ -57,13 +57,13 @@ class TestGetProjects:
         assert result.data[0]["lead"] == "Alice"
         assert result.data[0]["project_type_key"] == "software"
 
-    async def test_empty_projects(self, mock_client: AtlassianClient) -> None:
+    async def test_empty_projects(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.projects.return_value = []
         result = await get_projects(mock_client)
         assert result.count == 0
         assert result.data == []
 
-    async def test_lead_as_string(self, mock_client: AtlassianClient) -> None:
+    async def test_lead_as_string(self, mock_client: JiraClient) -> None:
         """atlassian-python-api may return lead as a string."""
         mock_client._jira_instance.projects.return_value = [
             {
@@ -76,7 +76,7 @@ class TestGetProjects:
         result = await get_projects(mock_client)
         assert result.data[0]["lead"] == "Alice"
 
-    async def test_null_lead(self, mock_client: AtlassianClient) -> None:
+    async def test_null_lead(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.projects.return_value = [
             {
                 "key": "PROJ",
@@ -90,7 +90,7 @@ class TestGetProjects:
 
 
 class TestGetProjectVersions:
-    async def test_returns_versions(self, mock_client: AtlassianClient) -> None:
+    async def test_returns_versions(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.get_project_versions.return_value = [
             {
                 "id": "10001",
@@ -114,7 +114,7 @@ class TestGetProjectVersions:
         assert result.data[0]["release_date"] == "2026-01-15"
         mock_client._jira_instance.get_project_versions.assert_called_once_with("PROJ")
 
-    async def test_handles_int_id(self, mock_client: AtlassianClient) -> None:
+    async def test_handles_int_id(self, mock_client: JiraClient) -> None:
         """id may come as int from atlassian-python-api."""
         mock_client._jira_instance.get_project_versions.return_value = [
             {"id": 10001, "name": "v1.0", "released": False},
@@ -122,14 +122,14 @@ class TestGetProjectVersions:
         result = await get_project_versions(mock_client, "PROJ")
         assert result.data[0]["id"] == "10001"
 
-    async def test_empty_versions(self, mock_client: AtlassianClient) -> None:
+    async def test_empty_versions(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.get_project_versions.return_value = []
         result = await get_project_versions(mock_client, "PROJ")
         assert result.count == 0
 
 
 class TestGetProjectComponents:
-    async def test_returns_components(self, mock_client: AtlassianClient) -> None:
+    async def test_returns_components(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.get_project_components.return_value = [
             {
                 "id": "20001",
@@ -150,14 +150,14 @@ class TestGetProjectComponents:
         assert result.data[0]["lead"] == "Alice"
         mock_client._jira_instance.get_project_components.assert_called_once_with("PROJ")
 
-    async def test_component_lead_as_string(self, mock_client: AtlassianClient) -> None:
+    async def test_component_lead_as_string(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.get_project_components.return_value = [
             {"id": "20001", "name": "Backend", "lead": "Alice"},
         ]
         result = await get_project_components(mock_client, "PROJ")
         assert result.data[0]["lead"] == "Alice"
 
-    async def test_component_null_lead(self, mock_client: AtlassianClient) -> None:
+    async def test_component_null_lead(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.get_project_components.return_value = [
             {"id": "20001", "name": "Backend", "lead": None},
         ]
@@ -166,7 +166,7 @@ class TestGetProjectComponents:
 
 
 class TestCreateVersion:
-    async def test_creates_version(self, mock_client: AtlassianClient) -> None:
+    async def test_creates_version(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.create_version.return_value = {
             "id": "10003",
             "name": "v3.0",
@@ -179,7 +179,7 @@ class TestCreateVersion:
         assert result.data["status"] == "created"
         mock_client._jira_instance.create_version.assert_called_once_with("v3.0", "PROJ")
 
-    async def test_handles_int_id(self, mock_client: AtlassianClient) -> None:
+    async def test_handles_int_id(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.create_version.return_value = {
             "id": 10004,
             "name": "v4.0",
@@ -189,27 +189,27 @@ class TestCreateVersion:
 
 
 class TestGetProjectMetadata:
-    async def test_components_only(self, mock_client: AtlassianClient) -> None:
+    async def test_components_only(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.get_project_components.return_value = [{"id": "1", "name": "Backend"}]
         result = await get_project_metadata(mock_client, "PROJ", include=["components"])
         assert "components" in result.data
         assert "versions" not in result.data
         assert result.data["components"] == [{"id": "1", "name": "Backend"}]
 
-    async def test_versions_only(self, mock_client: AtlassianClient) -> None:
+    async def test_versions_only(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.get_project_versions.return_value = [{"id": "1", "name": "v1", "released": False}]
         result = await get_project_metadata(mock_client, "PROJ", include=["versions"])
         assert "versions" in result.data
         assert "components" not in result.data
 
-    async def test_all_sentinel(self, mock_client: AtlassianClient) -> None:
+    async def test_all_sentinel(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.get_project_components.return_value = []
         mock_client._jira_instance.get_project_versions.return_value = []
         result = await get_project_metadata(mock_client, "PROJ", include=["all"])
         assert "components" in result.data
         assert "versions" in result.data
 
-    async def test_default_all(self, mock_client: AtlassianClient) -> None:
+    async def test_default_all(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.get_project_components.return_value = []
         mock_client._jira_instance.get_project_versions.return_value = []
         result = await get_project_metadata(mock_client, "PROJ")

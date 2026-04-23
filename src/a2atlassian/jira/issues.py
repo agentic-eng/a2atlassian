@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from a2atlassian.formatter import OperationResult
 
 if TYPE_CHECKING:
-    from a2atlassian.client import AtlassianClient
+    from a2atlassian.jira_client import JiraClient
 
 
 DEFAULT_SEARCH_FIELDS: list[str] = ["summary", "status", "assignee", "priority", "issuetype", "parent", "updated"]
@@ -66,7 +66,7 @@ def _extract_issue_detail(raw: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-async def get_issue(client: AtlassianClient, issue_key: str) -> OperationResult:
+async def get_issue(client: JiraClient, issue_key: str) -> OperationResult:
     """Fetch a single Jira issue by key."""
     t0 = time.monotonic()
     data = await client._call(client._jira.issue, issue_key)
@@ -82,7 +82,7 @@ async def get_issue(client: AtlassianClient, issue_key: str) -> OperationResult:
 
 
 async def search(
-    client: AtlassianClient,
+    client: JiraClient,
     jql: str,
     limit: int = 50,
     offset: int = 0,
@@ -120,7 +120,7 @@ async def search(
     )
 
 
-async def search_count(client: AtlassianClient, jql: str) -> OperationResult:
+async def search_count(client: JiraClient, jql: str) -> OperationResult:
     """Return just the total count for a JQL — cheap pre-check before a broad search."""
     t0 = time.monotonic()
     response = await client._call(client._jira.jql, jql, limit=0, fields=[])
@@ -136,7 +136,7 @@ async def search_count(client: AtlassianClient, jql: str) -> OperationResult:
 
 
 async def create_issue(
-    client: AtlassianClient,
+    client: JiraClient,
     project_key: str,
     summary: str,
     issue_type: str,
@@ -176,7 +176,7 @@ async def create_issue(
 
 
 async def update_issue(
-    client: AtlassianClient,
+    client: JiraClient,
     issue_key: str,
     fields: dict[str, Any],
 ) -> OperationResult:
@@ -195,7 +195,7 @@ async def update_issue(
 
 
 async def delete_issue(
-    client: AtlassianClient,
+    client: JiraClient,
     issue_key: str,
 ) -> OperationResult:
     """Delete a Jira issue."""

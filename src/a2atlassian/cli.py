@@ -9,9 +9,9 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import click
 
 from a2atlassian import __version__
-from a2atlassian.client import AtlassianClient
 from a2atlassian.config import DEFAULT_CONFIG_DIR
 from a2atlassian.connections import ConnectionInfo, ConnectionStore
+from a2atlassian.jira_client import JiraClient
 
 _TZ_ALIASES: dict[str, str] = {
     "UTC": "UTC",
@@ -74,7 +74,7 @@ def login(connection: str, url: str, email: str, token: str, read_only: bool, ti
         timezone=resolved_tz,
         worklog_admins=tuple(worklog_admins),
     )
-    client = AtlassianClient(info)
+    client = JiraClient(info)
 
     try:
         user = asyncio.run(client.validate())

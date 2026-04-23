@@ -6,7 +6,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from a2atlassian.client import AtlassianClient
 from a2atlassian.connections import ConnectionInfo
 from a2atlassian.formatter import OperationResult
 from a2atlassian.jira.sprints import (
@@ -16,10 +15,11 @@ from a2atlassian.jira.sprints import (
     get_sprints,
     update_sprint,
 )
+from a2atlassian.jira_client import JiraClient
 
 
 @pytest.fixture
-def mock_client() -> AtlassianClient:
+def mock_client() -> JiraClient:
     conn = ConnectionInfo(
         connection="test",
         url="https://test.atlassian.net",
@@ -27,13 +27,13 @@ def mock_client() -> AtlassianClient:
         token="tok",
         read_only=False,
     )
-    client = AtlassianClient(conn)
+    client = JiraClient(conn)
     client._jira_instance = MagicMock()
     return client
 
 
 class TestGetSprints:
-    async def test_returns_sprints_from_values(self, mock_client: AtlassianClient) -> None:
+    async def test_returns_sprints_from_values(self, mock_client: JiraClient) -> None:
         """get_all_sprints_from_board returns {"values": [...]}."""
         mock_client._jira_instance.get_all_sprints_from_board.return_value = {
             "values": [
@@ -51,7 +51,7 @@ class TestGetSprints:
         assert result.data[0]["end_date"] == "2026-04-14"
         assert result.data[1]["state"] == "future"
 
-    async def test_returns_sprints_from_list(self, mock_client: AtlassianClient) -> None:
+    async def test_returns_sprints_from_list(self, mock_client: JiraClient) -> None:
         """Response may be a plain list."""
         mock_client._jira_instance.get_all_sprints_from_board.return_value = [
             {"id": 3, "name": "Sprint 3", "state": "closed", "startDate": "2026-03-01", "endDate": "2026-03-14"},
@@ -60,7 +60,7 @@ class TestGetSprints:
         assert result.count == 1
         assert result.data[0]["state"] == "closed"
 
-    async def test_handles_missing_state(self, mock_client: AtlassianClient) -> None:
+    async def test_handles_missing_state(self, mock_client: JiraClient) -> None:
         """state may be missing entirely."""
         mock_client._jira_instance.get_all_sprints_from_board.return_value = {
             "values": [
@@ -70,7 +70,7 @@ class TestGetSprints:
         result = await get_sprints(mock_client, board_id=10)
         assert result.data[0]["state"] == ""
 
-    async def test_handles_int_id(self, mock_client: AtlassianClient) -> None:
+    async def test_handles_int_id(self, mock_client: JiraClient) -> None:
         """id is cast to string."""
         mock_client._jira_instance.get_all_sprints_from_board.return_value = {
             "values": [
@@ -80,7 +80,7 @@ class TestGetSprints:
         result = await get_sprints(mock_client, board_id=10)
         assert result.data[0]["id"] == "99"
 
-    async def test_empty_sprints(self, mock_client: AtlassianClient) -> None:
+    async def test_empty_sprints(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.get_all_sprints_from_board.return_value = {"values": []}
         result = await get_sprints(mock_client, board_id=10)
         assert result.count == 0
@@ -88,7 +88,7 @@ class TestGetSprints:
 
 
 class TestGetSprintIssues:
-    async def test_returns_issues(self, mock_client: AtlassianClient) -> None:
+    async def test_returns_issues(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.get_sprint_issues.return_value = {
             "issues": [
                 {"key": "PROJ-1", "fields": {"summary": "First", "status": {"name": "Open"}}},
@@ -101,12 +101,12 @@ class TestGetSprintIssues:
         assert result.count == 2
         assert result.data[0]["key"] == "PROJ-1"
 
-    async def test_pagination_params(self, mock_client: AtlassianClient) -> None:
+    async def test_pagination_params(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.get_sprint_issues.return_value = {"issues": [], "total": 0}
         await get_sprint_issues(mock_client, sprint_id=1, limit=25, offset=10)
         mock_client._jira_instance.get_sprint_issues.assert_called_once_with(1, startAt=10, maxResults=25)
 
-    async def test_truncation_flag(self, mock_client: AtlassianClient) -> None:
+    async def test_truncation_flag(self, mock_client: JiraClient) -> None:
         issues = [{"key": f"PROJ-{i}", "fields": {"summary": f"Issue {i}"}} for i in range(50)]
         mock_client._jira_instance.get_sprint_issues.return_value = {
             "issues": issues,
@@ -117,7 +117,7 @@ class TestGetSprintIssues:
 
 
 class TestCreateSprint:
-    async def test_creates_sprint(self, mock_client: AtlassianClient) -> None:
+    async def test_creates_sprint(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.create_sprint.return_value = {
             "id": 42,
             "name": "New Sprint",
@@ -141,7 +141,7 @@ class TestCreateSprint:
             name="New Sprint", originBoardId=10, startDate="2026-04-15", endDate="2026-04-28"
         )
 
-    async def test_creates_sprint_without_dates(self, mock_client: AtlassianClient) -> None:
+    async def test_creates_sprint_without_dates(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.create_sprint.return_value = {
             "id": 43,
             "name": "Dateless Sprint",
@@ -154,7 +154,7 @@ class TestCreateSprint:
 
 
 class TestUpdateSprint:
-    async def test_updates_sprint(self, mock_client: AtlassianClient) -> None:
+    async def test_updates_sprint(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.update_partially_sprint.return_value = {
             "id": 42,
             "name": "Renamed Sprint",
@@ -173,7 +173,7 @@ class TestUpdateSprint:
         assert result.data["state"] == "active"
         mock_client._jira_instance.update_partially_sprint.assert_called_once_with(42, name="Renamed Sprint", state="active")
 
-    async def test_updates_sprint_non_dict_response(self, mock_client: AtlassianClient) -> None:
+    async def test_updates_sprint_non_dict_response(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.update_partially_sprint.return_value = None
         result = await update_sprint(mock_client, sprint_id=42, name="X")
         assert result.data["sprint_id"] == 42
@@ -181,7 +181,7 @@ class TestUpdateSprint:
 
 
 class TestAddIssuesToSprint:
-    async def test_adds_issues(self, mock_client: AtlassianClient) -> None:
+    async def test_adds_issues(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.add_issues_to_sprint.return_value = None
         result = await add_issues_to_sprint(mock_client, sprint_id=42, issue_keys=["PROJ-1", "PROJ-2"])
         assert isinstance(result, OperationResult)

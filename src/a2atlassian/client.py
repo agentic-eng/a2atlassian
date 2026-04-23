@@ -59,7 +59,3 @@ class AtlassianClientBase:
 
         msg = "Unexpected: retry loop exited without returning or raising"
         raise A2AtlassianError(msg)  # pragma: no cover
-
-
-# Temporary shim — removed in Task 4 once every caller imports from jira_client.
-from a2atlassian.jira_client import JiraClient as AtlassianClient  # noqa: E402, F401

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from a2atlassian.formatter import OperationResult
 
 if TYPE_CHECKING:
-    from a2atlassian.client import AtlassianClient
+    from a2atlassian.jira_client import JiraClient
 
 
 def _extract_comment(raw: dict[str, Any]) -> dict[str, Any]:
@@ -42,7 +42,7 @@ def _adf_to_text(adf: dict[str, Any]) -> str:
 
 
 async def get_comments(
-    client: AtlassianClient,
+    client: JiraClient,
     issue_key: str,
     limit: int = 50,
     offset: int = 0,
@@ -64,7 +64,7 @@ async def get_comments(
     )
 
 
-async def add_comment(client: AtlassianClient, issue_key: str, body: str) -> OperationResult:
+async def add_comment(client: JiraClient, issue_key: str, body: str) -> OperationResult:
     """Add a comment to a Jira issue. Uses API v2 (wiki markup)."""
     t0 = time.monotonic()
     data = await client._call(client._jira.issue_add_comment, issue_key, body)
@@ -80,7 +80,7 @@ async def add_comment(client: AtlassianClient, issue_key: str, body: str) -> Ope
 
 
 async def edit_comment(
-    client: AtlassianClient,
+    client: JiraClient,
     issue_key: str,
     comment_id: str,
     body: str,

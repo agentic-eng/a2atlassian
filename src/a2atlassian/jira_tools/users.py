@@ -13,13 +13,13 @@ if TYPE_CHECKING:
 
     from mcp.server.fastmcp import FastMCP
 
-    from a2atlassian.client import AtlassianClient
     from a2atlassian.errors import ErrorEnricher
+    from a2atlassian.jira_client import JiraClient
 
 
 def register_read(
     server: FastMCP,
-    get_client: Callable[[str], AtlassianClient],
+    get_client: Callable[[str], JiraClient],
     enricher: ErrorEnricher,
 ) -> None:
     @server.tool()

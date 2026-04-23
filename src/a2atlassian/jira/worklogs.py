@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 from a2atlassian.formatter import OperationResult
 
 if TYPE_CHECKING:
-    from a2atlassian.client import AtlassianClient
+    from a2atlassian.jira_client import JiraClient
 
 
 def _adf_to_text(adf: dict[str, Any]) -> str:
@@ -46,7 +46,7 @@ def _extract_worklog(raw: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-async def get_worklogs(client: AtlassianClient, issue_key: str) -> OperationResult:
+async def get_worklogs(client: JiraClient, issue_key: str) -> OperationResult:
     """Get worklogs for a Jira issue."""
     t0 = time.monotonic()
     data = await client._call(client._jira.issue_get_worklog, issue_key)
@@ -70,7 +70,7 @@ async def get_worklogs(client: AtlassianClient, issue_key: str) -> OperationResu
 
 
 async def add_worklog(
-    client: AtlassianClient,
+    client: JiraClient,
     issue_key: str,
     time_spent: str,
     comment: str | None = None,
@@ -161,7 +161,7 @@ def _aggregate_rows(
 
 
 async def _fetch_issue_worklogs(
-    client: AtlassianClient,
+    client: JiraClient,
     key: str,
     asn: dict[str, str],
     admins: tuple[str, ...],
@@ -204,7 +204,7 @@ async def _fetch_issue_worklogs(
 
 
 async def get_worklogs_summary(
-    client: AtlassianClient,
+    client: JiraClient,
     date_from: str,
     date_to: str | None = None,
     people: list[str] | None = None,

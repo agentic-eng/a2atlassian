@@ -8,9 +8,9 @@ import uuid
 
 import pytest
 
-from a2atlassian.client import AtlassianClient
 from a2atlassian.connections import ConnectionInfo
 from a2atlassian.jira.issues import create_issue, delete_issue
+from a2atlassian.jira_client import JiraClient
 
 
 def _require_env(name: str) -> str:
@@ -27,7 +27,7 @@ def test_prefix() -> str:
 
 
 @pytest.fixture
-async def integration_client() -> AtlassianClient:
+async def integration_client() -> JiraClient:
     conn = ConnectionInfo(
         project="test",
         url=_require_env("A2ATLASSIAN_TEST_URL"),
@@ -35,7 +35,7 @@ async def integration_client() -> AtlassianClient:
         token=_require_env("A2ATLASSIAN_TEST_TOKEN"),
         read_only=False,
     )
-    return AtlassianClient(conn)
+    return JiraClient(conn)
 
 
 @pytest.fixture
@@ -44,7 +44,7 @@ def test_project_key() -> str:
 
 
 @pytest.fixture
-async def test_issue(integration_client: AtlassianClient, test_prefix: str, test_project_key: str):
+async def test_issue(integration_client: JiraClient, test_prefix: str, test_project_key: str):
     result = await create_issue(
         integration_client,
         test_project_key,

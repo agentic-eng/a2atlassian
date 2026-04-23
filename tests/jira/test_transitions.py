@@ -6,14 +6,14 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from a2atlassian.client import AtlassianClient
 from a2atlassian.connections import ConnectionInfo
 from a2atlassian.formatter import OperationResult
 from a2atlassian.jira.transitions import get_transitions, transition_issue
+from a2atlassian.jira_client import JiraClient
 
 
 @pytest.fixture
-def mock_client() -> AtlassianClient:
+def mock_client() -> JiraClient:
     conn = ConnectionInfo(
         connection="test",
         url="https://test.atlassian.net",
@@ -21,13 +21,13 @@ def mock_client() -> AtlassianClient:
         token="tok",
         read_only=False,
     )
-    client = AtlassianClient(conn)
+    client = JiraClient(conn)
     client._jira_instance = MagicMock()
     return client
 
 
 class TestGetTransitions:
-    async def test_returns_transitions_dict_to(self, mock_client: AtlassianClient) -> None:
+    async def test_returns_transitions_dict_to(self, mock_client: JiraClient) -> None:
         """REST API returns 'to' as a dict with a 'name' key."""
         mock_client._jira_instance.get_issue_transitions.return_value = [
             {"id": "11", "name": "To Do", "to": {"name": "To Do"}},
@@ -41,7 +41,7 @@ class TestGetTransitions:
         assert result.data[0]["to_status"] == "To Do"
         assert result.data[0]["id"] == "11"
 
-    async def test_returns_transitions_string_to(self, mock_client: AtlassianClient) -> None:
+    async def test_returns_transitions_string_to(self, mock_client: JiraClient) -> None:
         """atlassian-python-api returns 'to' as a plain string."""
         mock_client._jira_instance.get_issue_transitions.return_value = [
             {"id": 11, "name": "To Do", "to": "To Do"},
@@ -55,7 +55,7 @@ class TestGetTransitions:
 
 
 class TestTransitionIssue:
-    async def test_transition_by_id(self, mock_client: AtlassianClient) -> None:
+    async def test_transition_by_id(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.issue_transition.return_value = None
         result = await transition_issue(mock_client, "PROJ-1", "21")
         assert isinstance(result, OperationResult)

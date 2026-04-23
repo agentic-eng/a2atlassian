@@ -9,7 +9,7 @@ from a2atlassian.formatter import OperationResult
 from a2atlassian.jira.issues import _extract_issue_summary
 
 if TYPE_CHECKING:
-    from a2atlassian.client import AtlassianClient
+    from a2atlassian.jira_client import JiraClient
 
 
 def _extract_sprint(raw: dict[str, Any]) -> dict[str, Any]:
@@ -23,7 +23,7 @@ def _extract_sprint(raw: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-async def get_sprints(client: AtlassianClient, board_id: int) -> OperationResult:
+async def get_sprints(client: JiraClient, board_id: int) -> OperationResult:
     """Get all sprints for a Jira board."""
     t0 = time.monotonic()
     data = await client._call(client._jira.get_all_sprints_from_board, board_id)
@@ -47,7 +47,7 @@ async def get_sprints(client: AtlassianClient, board_id: int) -> OperationResult
 
 
 async def get_sprint_issues(
-    client: AtlassianClient,
+    client: JiraClient,
     sprint_id: int,
     limit: int = 50,
     offset: int = 0,
@@ -84,7 +84,7 @@ async def get_sprint_issues(
 
 
 async def create_sprint(
-    client: AtlassianClient,
+    client: JiraClient,
     name: str,
     board_id: int,
     start_date: str | None = None,
@@ -118,7 +118,7 @@ async def create_sprint(
 
 
 async def update_sprint(
-    client: AtlassianClient,
+    client: JiraClient,
     sprint_id: int,
     **kwargs: Any,
 ) -> OperationResult:
@@ -144,7 +144,7 @@ async def update_sprint(
 
 
 async def add_issues_to_sprint(
-    client: AtlassianClient,
+    client: JiraClient,
     sprint_id: int,
     issue_keys: list[str],
 ) -> OperationResult:

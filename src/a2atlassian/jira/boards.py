@@ -9,7 +9,7 @@ from a2atlassian.formatter import OperationResult
 from a2atlassian.jira.issues import _extract_issue_summary
 
 if TYPE_CHECKING:
-    from a2atlassian.client import AtlassianClient
+    from a2atlassian.jira_client import JiraClient
 
 
 def _extract_board(raw: dict[str, Any]) -> dict[str, Any]:
@@ -36,7 +36,7 @@ def _extract_board(raw: dict[str, Any]) -> dict[str, Any]:
 
 
 async def get_boards(
-    client: AtlassianClient,
+    client: JiraClient,
     limit: int = 50,
     offset: int = 0,
 ) -> OperationResult:
@@ -68,7 +68,7 @@ async def get_boards(
 
 
 async def get_board_issues(
-    client: AtlassianClient,
+    client: JiraClient,
     board_id: int,
     limit: int = 50,
     offset: int = 0,

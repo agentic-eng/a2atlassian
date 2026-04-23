@@ -37,7 +37,7 @@ class TestLogin:
         assert result.exit_code == 0
         assert "--connection" in result.output or "-c" in result.output
 
-    @patch("a2atlassian.cli.AtlassianClient")
+    @patch("a2atlassian.cli.JiraClient")
     def test_login_success(self, mock_client_cls, runner: CliRunner, tmp_path: Path) -> None:
         mock_instance = mock_client_cls.return_value
         mock_instance.validate = AsyncMock(return_value={"displayName": "Alice"})
@@ -82,14 +82,14 @@ class TestConnections:
 
 
 def _patch_cli_for_login_test(monkeypatch, tmp_path):
-    """Patch AtlassianClient.validate to stub network + point store at tmp_path."""
+    """Patch JiraClient.validate to stub network + point store at tmp_path."""
     from unittest.mock import AsyncMock
 
     from a2atlassian import cli as cli_mod
     from a2atlassian.connections import ConnectionStore
 
     monkeypatch.setattr(
-        "a2atlassian.client.AtlassianClient.validate",
+        "a2atlassian.jira_client.JiraClient.validate",
         AsyncMock(return_value={"displayName": "test-user"}),
     )
     monkeypatch.setattr(cli_mod, "_store", lambda: ConnectionStore(tmp_path))

@@ -6,10 +6,10 @@ import sys
 
 from mcp.server.fastmcp import FastMCP
 
-from a2atlassian.client import AtlassianClient
 from a2atlassian.config import DEFAULT_CONFIG_DIR
 from a2atlassian.connections import ConnectionInfo, ConnectionStore
 from a2atlassian.errors import ErrorEnricher
+from a2atlassian.jira_client import JiraClient
 from a2atlassian.jira_tools import FEATURES as JIRA_FEATURES
 
 server = FastMCP(
@@ -51,9 +51,9 @@ def _get_connection(connection: str) -> ConnectionInfo:
     return info
 
 
-def _get_client(connection: str) -> AtlassianClient:
-    """Resolve a connection and return a client."""
-    return AtlassianClient(_get_connection(connection))
+def _get_jira_client(connection: str) -> JiraClient:
+    """Resolve a connection and return a Jira client."""
+    return JiraClient(_get_connection(connection))
 
 
 # --- Connection management tools ---
@@ -89,7 +89,7 @@ async def login(
         timezone=timezone,
         worklog_admins=admins,
     )
-    client = AtlassianClient(info)
+    client = JiraClient(info)
     user = await client.validate()
     store = _store()
     path = store.save(
@@ -148,7 +148,7 @@ def _register_jira_tools(features: set[str] | None) -> None:
         if features is not None and name not in features:
             continue
         if hasattr(mod, "register_read"):
-            mod.register_read(server, _get_client, _enricher)
+            mod.register_read(server, _get_jira_client, _enricher)
         if hasattr(mod, "register_write"):
             mod.register_write(server, _get_connection, _enricher)
 

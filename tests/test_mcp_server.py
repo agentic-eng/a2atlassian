@@ -324,7 +324,7 @@ class TestLoginToolSignature:
         store = ConnectionStore(tmp_path)
         monkeypatch.setattr(mcp_server, "_store", lambda: store)
 
-        with patch("a2atlassian.mcp_server.AtlassianClient") as mock_client_cls:
+        with patch("a2atlassian.mcp_server.JiraClient") as mock_client_cls:
             instance = mock_client_cls.return_value
             instance.validate = AsyncMock(return_value={"displayName": "Alice"})
 

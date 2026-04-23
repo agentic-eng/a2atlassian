@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from a2atlassian.formatter import OperationResult
 
 if TYPE_CHECKING:
-    from a2atlassian.client import AtlassianClient
+    from a2atlassian.jira_client import JiraClient
 
 
 def _extract_project(raw: dict[str, Any]) -> dict[str, Any]:
@@ -51,7 +51,7 @@ def _extract_component(raw: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-async def get_projects(client: AtlassianClient) -> OperationResult:
+async def get_projects(client: JiraClient) -> OperationResult:
     """List all Jira projects."""
     t0 = time.monotonic()
     data = await client._call(client._jira.projects)
@@ -68,7 +68,7 @@ async def get_projects(client: AtlassianClient) -> OperationResult:
     )
 
 
-async def get_project_versions(client: AtlassianClient, project_key: str) -> OperationResult:
+async def get_project_versions(client: JiraClient, project_key: str) -> OperationResult:
     """Get versions for a Jira project."""
     t0 = time.monotonic()
     data = await client._call(client._jira.get_project_versions, project_key)
@@ -85,7 +85,7 @@ async def get_project_versions(client: AtlassianClient, project_key: str) -> Ope
     )
 
 
-async def get_project_components(client: AtlassianClient, project_key: str) -> OperationResult:
+async def get_project_components(client: JiraClient, project_key: str) -> OperationResult:
     """Get components for a Jira project."""
     t0 = time.monotonic()
     data = await client._call(client._jira.get_project_components, project_key)
@@ -103,7 +103,7 @@ async def get_project_components(client: AtlassianClient, project_key: str) -> O
 
 
 async def get_project_metadata(
-    client: AtlassianClient,
+    client: JiraClient,
     project_key: str,
     include: list[str] | None = None,
 ) -> OperationResult:
@@ -132,7 +132,7 @@ async def get_project_metadata(
 
 
 async def create_version(
-    client: AtlassianClient,
+    client: JiraClient,
     project_key: str,
     name: str,
     **kwargs: Any,

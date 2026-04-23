@@ -6,7 +6,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from a2atlassian.client import AtlassianClient
 from a2atlassian.connections import ConnectionInfo
 from a2atlassian.formatter import OperationResult
 from a2atlassian.jira.links import (
@@ -14,10 +13,11 @@ from a2atlassian.jira.links import (
     get_link_types,
     remove_issue_link,
 )
+from a2atlassian.jira_client import JiraClient
 
 
 @pytest.fixture
-def mock_client() -> AtlassianClient:
+def mock_client() -> JiraClient:
     conn = ConnectionInfo(
         connection="test",
         url="https://test.atlassian.net",
@@ -25,13 +25,13 @@ def mock_client() -> AtlassianClient:
         token="tok",
         read_only=False,
     )
-    client = AtlassianClient(conn)
+    client = JiraClient(conn)
     client._jira_instance = MagicMock()
     return client
 
 
 class TestGetLinkTypes:
-    async def test_returns_link_types_from_dict(self, mock_client: AtlassianClient) -> None:
+    async def test_returns_link_types_from_dict(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.get_issue_link_types.return_value = {
             "issueLinkTypes": [
                 {"id": "1", "name": "Blocks", "inward": "is blocked by", "outward": "blocks"},
@@ -46,7 +46,7 @@ class TestGetLinkTypes:
         assert result.data[0]["inward"] == "is blocked by"
         assert result.data[0]["outward"] == "blocks"
 
-    async def test_returns_link_types_from_list(self, mock_client: AtlassianClient) -> None:
+    async def test_returns_link_types_from_list(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.get_issue_link_types.return_value = [
             {"id": 10, "name": "Relates", "inward": "relates to", "outward": "relates to"},
         ]
@@ -55,7 +55,7 @@ class TestGetLinkTypes:
         assert result.data[0]["id"] == "10"
         assert result.data[0]["name"] == "Relates"
 
-    async def test_empty_link_types(self, mock_client: AtlassianClient) -> None:
+    async def test_empty_link_types(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.get_issue_link_types.return_value = {"issueLinkTypes": []}
         result = await get_link_types(mock_client)
         assert result.count == 0
@@ -63,7 +63,7 @@ class TestGetLinkTypes:
 
 
 class TestCreateIssueLink:
-    async def test_creates_link(self, mock_client: AtlassianClient) -> None:
+    async def test_creates_link(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.create_issue_link.return_value = None
         result = await create_issue_link(mock_client, "Blocks", "PROJ-1", "PROJ-2")
         assert isinstance(result, OperationResult)
@@ -81,7 +81,7 @@ class TestCreateIssueLink:
 
 
 class TestRemoveIssueLink:
-    async def test_removes_link(self, mock_client: AtlassianClient) -> None:
+    async def test_removes_link(self, mock_client: JiraClient) -> None:
         mock_client._jira_instance.remove_issue_link.return_value = None
         result = await remove_issue_link(mock_client, "12345")
         assert isinstance(result, OperationResult)
