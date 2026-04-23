@@ -233,14 +233,27 @@ async def get_worklogs_summary(
 
     t0 = time.monotonic()
 
-    response = await client._call(
-        client._jira.jql,
-        jql,
-        limit=500,
-        start=0,
-        fields=["summary", "assignee"],
-    )
-    candidate_issues = response.get("issues", []) if isinstance(response, dict) else []
+    candidate_issues: list[dict[str, Any]] = []
+    start = 0
+    page_size = 500
+    while True:
+        response = await client._call(
+            client._jira.jql,
+            jql,
+            limit=page_size,
+            start=start,
+            fields=["summary", "assignee"],
+        )
+        if not isinstance(response, dict):
+            break
+        batch = response.get("issues", [])
+        if not batch:
+            break
+        candidate_issues.extend(batch)
+        total = response.get("total", len(candidate_issues))
+        start += len(batch)
+        if start >= total or len(batch) < page_size:
+            break
     per_issue_assignee = {iss.get("key", ""): _extract_assignee(iss) for iss in candidate_issues}
 
     rows: list[dict[str, Any]] = []

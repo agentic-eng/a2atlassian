@@ -60,17 +60,47 @@ def _get_client(connection: str) -> AtlassianClient:
 
 
 @server.tool()
-async def login(connection: str, url: str, email: str, token: str, read_only: bool = True) -> str:
+async def login(
+    connection: str,
+    url: str,
+    email: str,
+    token: str,
+    read_only: bool = True,
+    timezone: str = "UTC",
+    worklog_admins: list[str] | None = None,
+) -> str:
     """Save an Atlassian connection. Validates by calling /myself.
 
     For security, prefer passing token as ${ENV_VAR} reference (e.g., "${ATLASSIAN_TOKEN}")
     rather than a literal value. The variable is expanded at runtime, never stored resolved.
+
+    timezone: IANA zone name (e.g., 'Europe/Istanbul'); default 'UTC'. Used for
+    day-boundary math in jira_get_worklogs summary mode.
+    worklog_admins: list of emails allowed to proxy-log worklog hours on others'
+    tickets; those hours are attributed to the ticket's assignee.
     """
-    info = ConnectionInfo(connection=connection, url=url, email=email, token=token, read_only=read_only)
+    admins = tuple(worklog_admins or ())
+    info = ConnectionInfo(
+        connection=connection,
+        url=url,
+        email=email,
+        token=token,
+        read_only=read_only,
+        timezone=timezone,
+        worklog_admins=admins,
+    )
     client = AtlassianClient(info)
     user = await client.validate()
     store = _store()
-    path = store.save(connection=connection, url=url, email=email, token=token, read_only=read_only)
+    path = store.save(
+        connection,
+        url,
+        email,
+        token,
+        read_only=read_only,
+        timezone=timezone,
+        worklog_admins=list(admins),
+    )
     display_name = user.get("displayName", "unknown")
     return f"Connection saved: {path} (authenticated as {display_name})"
 

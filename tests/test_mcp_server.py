@@ -293,6 +293,56 @@ class TestConnectionNotFoundEnrichment:
         assert "Did you mean" in msg
 
 
+class TestLoginToolSignature:
+    """Verify the MCP login tool exposes timezone and worklog_admins parameters."""
+
+    def test_login_has_timezone_param(self) -> None:
+        import inspect
+
+        from a2atlassian.mcp_server import login
+
+        sig = inspect.signature(login)
+        assert "timezone" in sig.parameters
+        assert sig.parameters["timezone"].default == "UTC"
+
+    def test_login_has_worklog_admins_param(self) -> None:
+        import inspect
+
+        from a2atlassian.mcp_server import login
+
+        sig = inspect.signature(login)
+        assert "worklog_admins" in sig.parameters
+        assert sig.parameters["worklog_admins"].default is None
+
+    async def test_login_persists_timezone_and_admins(self, tmp_path, monkeypatch) -> None:
+        """login() passes timezone + worklog_admins through to ConnectionStore.save()."""
+        from unittest.mock import AsyncMock, patch
+
+        from a2atlassian import mcp_server
+        from a2atlassian.connections import ConnectionStore
+
+        store = ConnectionStore(tmp_path)
+        monkeypatch.setattr(mcp_server, "_store", lambda: store)
+
+        with patch("a2atlassian.mcp_server.AtlassianClient") as mock_client_cls:
+            instance = mock_client_cls.return_value
+            instance.validate = AsyncMock(return_value={"displayName": "Alice"})
+
+            result = await mcp_server.login(
+                connection="myproj",
+                url="https://myproj.atlassian.net",
+                email="alice@example.com",
+                token="tok",
+                timezone="Europe/Istanbul",
+                worklog_admins=["admin@example.com"],
+            )
+
+        assert "Alice" in result
+        loaded = store.load("myproj")
+        assert loaded.timezone == "Europe/Istanbul"
+        assert "admin@example.com" in loaded.worklog_admins
+
+
 class TestToolDeletions:
     def test_jira_get_issue_dev_info_is_absent(self) -> None:
         """Ensure the deleted placeholder tool is gone from source."""

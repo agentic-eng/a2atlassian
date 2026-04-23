@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.3.1 — 2026-04-23
+
+### Fixed
+
+- **`jira_get_worklogs` summary mode** now paginates through all matching issues instead of silently truncating at 500. Large date ranges correctly include all worklogs.
+
+### New
+
+- **MCP `login` tool** accepts `timezone` and `worklog_admins` parameters, matching the CLI. Agents creating connections via MCP can now set these without a CLI round-trip.
+
 ## v0.3.0 — 2026-04-23
 
 ### Breaking changes

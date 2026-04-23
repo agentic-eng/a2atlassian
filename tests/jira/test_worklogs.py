@@ -325,3 +325,83 @@ class TestTwoModeToolLogic:
         result = await tool_fn(connection="test", date_from="2026-04-22", detail="raw")
         assert isinstance(result, str)
         assert "raw" in result
+
+
+class TestWorklogsPagination:
+    """Unit tests for get_worklogs_summary pagination through large JQL result sets."""
+
+    async def test_summary_handles_non_dict_response(self) -> None:
+        """If jql returns a non-dict, the loop exits cleanly with no issues."""
+        conn = ConnectionInfo(
+            connection="test",
+            url="https://test.atlassian.net",
+            email="alice@example.com",
+            token="tok",
+            worklog_admins=(),
+            timezone="UTC",
+        )
+        client = AtlassianClient(conn)
+        client._jira_instance = MagicMock()
+        client._jira_instance.jql.return_value = None  # non-dict response
+
+        from a2atlassian.jira.worklogs import get_worklogs_summary
+
+        result = await get_worklogs_summary(client, date_from="2026-04-22", detail="total")
+        assert result.count == 0
+        assert client._jira_instance.jql.call_count == 1
+
+    async def test_summary_pages_through_large_results(self) -> None:
+        conn = ConnectionInfo(
+            connection="test",
+            url="https://test.atlassian.net",
+            email="alice@example.com",
+            token="tok",
+            worklog_admins=(),
+            timezone="UTC",
+        )
+        client = AtlassianClient(conn)
+        client._jira_instance = MagicMock()
+
+        page1 = {
+            "issues": [
+                {
+                    "key": f"K-{i}",
+                    "fields": {
+                        "summary": "s",
+                        "status": {"name": "x"},
+                        "assignee": {"displayName": "A", "emailAddress": "a@x.com"},
+                        "priority": None,
+                        "issuetype": None,
+                    },
+                }
+                for i in range(500)
+            ],
+            "total": 501,
+        }
+        page2 = {
+            "issues": [
+                {
+                    "key": "K-500",
+                    "fields": {
+                        "summary": "s",
+                        "status": {"name": "x"},
+                        "assignee": {"displayName": "A", "emailAddress": "a@x.com"},
+                        "priority": None,
+                        "issuetype": None,
+                    },
+                }
+            ],
+            "total": 501,
+        }
+        client._jira_instance.jql.side_effect = [page1, page2]
+        client._jira_instance.issue_get_worklog.return_value = {"worklogs": []}
+
+        from a2atlassian.jira.worklogs import get_worklogs_summary
+
+        await get_worklogs_summary(client, date_from="2026-04-22", detail="total")
+        # Both pages were requested
+        assert client._jira_instance.jql.call_count == 2
+        # Second page's issue key was also fetched
+        issue_keys_fetched = [call.args[0] for call in client._jira_instance.issue_get_worklog.call_args_list]
+        assert "K-500" in issue_keys_fetched
+        assert len(issue_keys_fetched) == 501
