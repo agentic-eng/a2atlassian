@@ -9,7 +9,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from a2atlassian.confluence.pages import get_page, get_page_children, resolve_page_identity, upsert_page, upsert_pages
+from a2atlassian.confluence.pages import (
+    get_page,
+    get_page_children,
+    resolve_page_identity,
+    upsert_page,
+    upsert_pages,
+)
 from a2atlassian.confluence_client import ConfluenceClient
 from a2atlassian.connections import ConnectionInfo
 from a2atlassian.formatter import OperationResult
@@ -199,7 +205,7 @@ class TestUpsertBatch:
             ],
         )
         assert isinstance(result, OperationResult)
-        assert result.data["summary"] == {"total": 2, "created": 2, "updated": 0, "failed": 0}
+        assert result.data["summary"] == {"total": 2, "created": 2, "updated": 0, "metadata_updated": 0, "failed": 0}
         assert len(result.data["succeeded"]) == 2
         assert result.data["failed"] == []
 
@@ -226,7 +232,7 @@ class TestUpsertBatch:
                 {"space": "SP", "title": "C", "content": "hi"},
             ],
         )
-        assert result.data["summary"] == {"total": 3, "created": 1, "updated": 0, "failed": 2}
+        assert result.data["summary"] == {"total": 3, "created": 1, "updated": 0, "metadata_updated": 0, "failed": 2}
         assert len(result.data["succeeded"]) == 1
         assert len(result.data["failed"]) == 2
         categories = {f["error_category"] for f in result.data["failed"]}
@@ -250,7 +256,7 @@ class TestUpsertBatch:
                 {"space": "SP", "title": "B", "content": "hi"},
             ],
         )
-        assert result.data["summary"] == {"total": 2, "created": 0, "updated": 2, "failed": 0}
+        assert result.data["summary"] == {"total": 2, "created": 0, "updated": 2, "metadata_updated": 0, "failed": 0}
 
     async def test_conflict_and_other_error_categories(self, mock_client: ConfluenceClient) -> None:
         # covers lines 233-237: conflict (409) and other error categories
@@ -280,7 +286,7 @@ class TestUpsertBatch:
 
     async def test_empty_batch(self, mock_client: ConfluenceClient) -> None:
         result = await upsert_pages(mock_client, pages=[])
-        assert result.data["summary"] == {"total": 0, "created": 0, "updated": 0, "failed": 0}
+        assert result.data["summary"] == {"total": 0, "created": 0, "updated": 0, "metadata_updated": 0, "failed": 0}
 
 
 class TestUpsertKnobs:
@@ -366,6 +372,90 @@ class TestUpsertKnobs:
         assert payload["value"] == "full-width"
         assert payload["version"] == {"number": 4}
         mock_client._confluence_instance.set_page_property.assert_not_called()
+
+    async def test_omitted_content_on_update_preserves_body(self, mock_client: ConfluenceClient) -> None:
+        """Omitting content on an update path must not touch the page body."""
+        mock_client._confluence_instance.get_page_by_title.return_value = {"id": "9", "title": "T"}
+        await upsert_page(
+            mock_client,
+            space="SP",
+            title="T",
+            content=None,
+            parent_id=None,
+            page_id=None,
+            content_format="markdown",
+            page_width="full-width",
+            emoji=None,
+            labels=None,
+        )
+        # update_page must NOT be called — body is preserved
+        mock_client._confluence_instance.update_page.assert_not_called()
+
+    async def test_omitted_content_returns_metadata_updated_status(self, mock_client: ConfluenceClient) -> None:
+        mock_client._confluence_instance.get_page_by_title.return_value = {"id": "9", "title": "T"}
+        result = await upsert_page(
+            mock_client,
+            space="SP",
+            title="T",
+            content=None,
+            parent_id=None,
+            page_id=None,
+            content_format="markdown",
+            page_width=None,
+            emoji=None,
+            labels=None,
+        )
+        assert result["status"] == "metadata-updated"
+        assert result["page_id"] == "9"
+
+    async def test_omitted_content_on_create_raises(self, mock_client: ConfluenceClient) -> None:
+        mock_client._confluence_instance.get_page_by_title.return_value = None
+        with pytest.raises(ValueError, match="content is required"):
+            await upsert_page(
+                mock_client,
+                space="SP",
+                title="T",
+                content=None,
+                parent_id=None,
+                page_id=None,
+                content_format="markdown",
+                page_width=None,
+                emoji=None,
+                labels=None,
+            )
+
+    async def test_batch_preserves_body_when_content_key_missing(self, mock_client: ConfluenceClient) -> None:
+        mock_client._confluence_instance.get_page_by_title.return_value = {"id": "9", "title": "T"}
+        result = await upsert_pages(
+            mock_client,
+            pages=[
+                {"space": "SP", "title": "T", "page_width": "full-width"},  # no 'content' key
+            ],
+        )
+        assert result.data["summary"]["metadata_updated"] == 1
+        mock_client._confluence_instance.update_page.assert_not_called()
+
+    async def test_empty_string_content_still_wipes_body(self, mock_client: ConfluenceClient) -> None:
+        """Empty string is explicit — it should still hit update_page and wipe."""
+        mock_client._confluence_instance.get_page_by_title.return_value = {"id": "9", "title": "T"}
+        mock_client._confluence_instance.update_page.return_value = {
+            "id": "9",
+            "version": {"number": 2},
+            "_links": {"webui": "/p/9"},
+        }
+        await upsert_page(
+            mock_client,
+            space="SP",
+            title="T",
+            content="",
+            parent_id=None,
+            page_id=None,
+            content_format="markdown",
+            page_width=None,
+            emoji=None,
+            labels=None,
+        )
+        mock_client._confluence_instance.update_page.assert_called_once()
 
     async def test_page_width_none_on_update_does_not_touch_property(self, mock_client: ConfluenceClient) -> None:
         mock_client._confluence_instance.get_page_by_title.return_value = {"id": "9", "title": "T"}

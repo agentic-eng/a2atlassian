@@ -7,6 +7,14 @@ Backlog for a2atlassian after v0.5.1.
 - [ ] `confluence_delete_page` — closes the CRUD asymmetry. ~5-line op + tool + 2 tests.
 - [ ] Confluence `--integration` test path — mirror `tests/integration/` from Jira against a real Confluence space. Catches `atlassian-python-api` + Confluence API drift.
 
+## From `docs/signals-from-protea-2026-04-23.md`
+
+- [ ] **S1** — `jira_get_boards` raises `'Jira' object has no attribute 'boards'` (likely needs `get_all_agile_boards()` or the agile sub-client).
+- [ ] **S10** — Fabric-editor rejection: surface the raw Confluence error body; optionally accept `editor` hint.
+- [ ] **S11** — audit `jira_search` defaults (`limit=50`, lean `fields` set) to reduce overflow-triggered context breaks.
+- [ ] **S12** — server-side guard: reject `content` containing `<parameter name=` as likely tool-scaffolding contamination.
+- [ ] **S14** — `jira_get_person_daily_hours(assignee, date, project)` helper that sums worklogs regardless of logger (proxy-logging correctness).
+
 ## Confluence content tools (ship only if the workflow hits the limit)
 
 - [ ] `confluence_add_comment` / `confluence_get_comments` — inline discussion on pages.

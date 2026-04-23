@@ -139,3 +139,7 @@ var/
 venv.bak/
 venv/
 wheels/
+
+# linter tooling
+node_modules/
+.similar-report.json

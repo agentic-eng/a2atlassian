@@ -189,7 +189,7 @@ async def upsert_page(
     *,
     space: str,
     title: str,
-    content: str,
+    content: str | None,
     parent_id: str | None,
     page_id: str | None,
     content_format: str,
@@ -199,12 +199,19 @@ async def upsert_page(
 ) -> dict[str, Any]:
     """Create or update a single Confluence page. Returns a succeeded-shaped dict.
 
+    When ``content`` is ``None`` on an update path, the page body is preserved and
+    only metadata (labels, emoji, page_width) is applied. Passing an empty string
+    is explicit and WILL wipe the body — use ``None`` / omit the key to preserve.
+
     Caller (batch upsert) wraps exceptions; this function may raise.
     """
-    body = content if content_format == "storage" else markdown_to_storage(content)
     resolved = await resolve_page_identity(client, space=space, title=title, page_id=page_id, parent_id=parent_id)
 
     if resolved is None:
+        if content is None:
+            msg = "content is required when creating a new page"
+            raise ValueError(msg)
+        body = content if content_format == "storage" else markdown_to_storage(content)
         raw = await client._call(
             client._confluence.create_page,
             space=space,
@@ -215,7 +222,17 @@ async def upsert_page(
             representation="storage",
         )
         status = "created"
+        page_id_out = str(raw.get("id", ""))
+        links = raw.get("_links") or {}
+        version = (raw.get("version") or {}).get("number", 0)
+    elif content is None:
+        # Metadata-only update path: do not touch body or title.
+        status = "metadata-updated"
+        page_id_out = resolved
+        links = {}
+        version = 0
     else:
+        body = content if content_format == "storage" else markdown_to_storage(content)
         raw = await client._call(
             client._confluence.update_page,
             page_id=resolved,
@@ -225,10 +242,9 @@ async def upsert_page(
             representation="storage",
         )
         status = "updated"
-
-    links = raw.get("_links") or {}
-    version = (raw.get("version") or {}).get("number", 0)
-    page_id_out = str(raw.get("id", resolved or ""))
+        page_id_out = str(raw.get("id", resolved))
+        links = raw.get("_links") or {}
+        version = (raw.get("version") or {}).get("number", 0)
 
     await _apply_labels(client, page_id_out, labels)
     await _apply_emoji(client, page_id_out, emoji)
@@ -243,6 +259,47 @@ async def upsert_page(
         "url": links.get("webui", ""),
         "version": version,
     }
+
+
+async def set_page_properties(
+    client: ConfluenceClient,
+    page_id: str,
+    *,
+    page_width: str | None = None,
+    emoji: str | None = None,
+    labels: list[str] | None = None,
+) -> OperationResult:
+    """Metadata-only write — physically cannot touch the page body or title.
+
+    At least one of ``page_width``, ``emoji``, ``labels`` should be provided; all-None
+    is a no-op that still verifies the page exists and returns success.
+    """
+    t0 = time.monotonic()
+    # Verify page exists — surfaces 404 cleanly rather than a confusing property error.
+    raw = await client._call(client._confluence.get_page_by_id, page_id)
+    if not raw:
+        msg = f"page_id {page_id} not found"
+        raise ValueError(msg)
+
+    applied: list[str] = []
+    await _apply_labels(client, page_id, labels)
+    if labels:
+        applied.append("labels")
+    await _apply_emoji(client, page_id, emoji)
+    if emoji is not None:
+        applied.append("emoji")
+    await _apply_page_width(client, page_id, page_width)
+    if page_width is not None:
+        applied.append("page_width")
+
+    elapsed = int((time.monotonic() - t0) * 1000)
+    return OperationResult(
+        name="set_page_properties",
+        data={"page_id": page_id, "applied": applied},
+        count=1,
+        truncated=False,
+        time_ms=elapsed,
+    )
 
 
 def _classify_error(exc: BaseException) -> str:
@@ -270,7 +327,7 @@ async def upsert_pages(
     t0 = time.monotonic()
     succeeded: list[dict[str, Any]] = []
     failed: list[dict[str, Any]] = []
-    created = updated = 0
+    created = updated = metadata_updated = 0
 
     for page in pages:
         title = page.get("title", "")
@@ -279,7 +336,7 @@ async def upsert_pages(
                 client,
                 space=page["space"],
                 title=title,
-                content=page["content"],
+                content=page.get("content"),
                 parent_id=page.get("parent_id"),
                 page_id=page.get("page_id"),
                 content_format=page.get("content_format", "markdown"),
@@ -290,13 +347,21 @@ async def upsert_pages(
             succeeded.append(out)
             if out["status"] == "created":
                 created += 1
+            elif out["status"] == "metadata-updated":
+                metadata_updated += 1
             else:
                 updated += 1
         except Exception as exc:  # noqa: BLE001 — batch semantics require swallowing per-page errors
             failed.append({"title": title, "error": str(exc), "error_category": _classify_error(exc)})
 
     elapsed = int((time.monotonic() - t0) * 1000)
-    summary = {"total": len(pages), "created": created, "updated": updated, "failed": len(failed)}
+    summary = {
+        "total": len(pages),
+        "created": created,
+        "updated": updated,
+        "metadata_updated": metadata_updated,
+        "failed": len(failed),
+    }
 
     return OperationResult(
         name="upsert_pages",

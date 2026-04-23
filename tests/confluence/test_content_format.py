@@ -56,9 +56,11 @@ class TestTables:
     def test_basic_table(self) -> None:
         src = "| A | B |\n| --- | --- |\n| 1 | 2 |\n| 3 | 4 |"
         out = markdown_to_storage(src)
-        assert out == (
-            "<table><tbody><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr><tr><td>3</td><td>4</td></tr></tbody></table>"
-        )
+        assert out.startswith("<table>")
+        assert out.endswith("</table>")
+        assert "<th>A</th><th>B</th>" in out
+        assert "<td>1</td><td>2</td>" in out
+        assert "<td>3</td><td>4</td>" in out
 
     def test_table_with_inline_mention(self) -> None:
         src = "| Who |\n| --- |\n| @user:abc |"
@@ -78,7 +80,7 @@ class TestDetailsExpand:
     def test_details_contains_translated_table(self) -> None:
         src = "<details><summary>Stats</summary>\n\n| A | B |\n| --- | --- |\n| 1 | 2 |\n\n</details>"
         out = markdown_to_storage(src)
-        assert "<table><tbody>" in out
+        assert "<table>" in out
         assert "<th>A</th><th>B</th>" in out
         assert "<td>1</td><td>2</td>" in out
 
@@ -116,9 +118,63 @@ class TestEdgeCases:
         assert out == "<p>hello</p><p>world</p>"
 
     def test_table_not_detected_with_invalid_separator(self) -> None:
-        # line 168: _looks_like_table returns False when separator cells contain non-dash/colon chars
         # "| A | B |\n| abc | def |" — second row is not a valid separator
         src = "| A | B |\n| abc | def |\n| 1 | 2 |"
         out = markdown_to_storage(src)
         # Should be treated as a plain paragraph, not a table
         assert "<table>" not in out
+
+
+class TestInline:
+    def test_bold(self) -> None:
+        assert "<strong>bold</strong>" in markdown_to_storage("**bold**")
+
+    def test_italic(self) -> None:
+        assert "<em>it</em>" in markdown_to_storage("*it*")
+
+    def test_inline_code(self) -> None:
+        assert "<code>x</code>" in markdown_to_storage("`x`")
+
+    def test_strikethrough(self) -> None:
+        assert "<s>gone</s>" in markdown_to_storage("~~gone~~")
+
+    def test_link(self) -> None:
+        assert '<a href="https://example.com">text</a>' in markdown_to_storage("[text](https://example.com)")
+
+
+class TestLists:
+    def test_unordered_dash(self) -> None:
+        out = markdown_to_storage("- a\n- b")
+        assert "<ul>" in out
+        assert "<li>a</li>" in out
+        assert "<li>b</li>" in out
+
+    def test_unordered_star(self) -> None:
+        out = markdown_to_storage("* a\n* b")
+        assert "<ul>" in out
+        assert "<li>a</li>" in out
+
+    def test_ordered(self) -> None:
+        out = markdown_to_storage("1. a\n2. b")
+        assert "<ol>" in out
+        assert "<li>a</li>" in out
+        assert "<li>b</li>" in out
+
+
+class TestBlockElements:
+    def test_horizontal_rule(self) -> None:
+        out = markdown_to_storage("before\n\n---\n\nafter")
+        assert "<hr" in out
+
+    def test_blockquote(self) -> None:
+        out = markdown_to_storage("> quoted")
+        assert "<blockquote>" in out
+        assert "quoted" in out
+
+    def test_setext_h1(self) -> None:
+        out = markdown_to_storage("Title\n=====")
+        assert "<h1>Title</h1>" in out
+
+    def test_setext_h2(self) -> None:
+        out = markdown_to_storage("Title\n-----")
+        assert "<h2>Title</h2>" in out

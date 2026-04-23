@@ -2,6 +2,38 @@
 
 ## Unreleased
 
+### Added
+- **`confluence_set_page_properties`** — metadata-only MCP tool that flips
+  `page_width`, `emoji`, or `labels` on an existing page. Physically cannot
+  touch the body or title. Use this for safe appearance toggles without
+  risking content.
+- **Preserve-on-omit semantics for `content`** in `confluence_upsert_pages`:
+  omit the `content` key entirely to leave the existing body untouched on
+  update (returns status `"metadata-updated"`). An empty string is still
+  explicit and wipes the body. Creating with no content raises cleanly.
+  The response summary gained a `metadata_updated` counter.
+- **Linter adoption** (from a2sdlc-engine): `jscpd` copy-paste detection,
+  `actionlint` for GitHub Actions workflows, advisory `scripts/find_similar.py`
+  (via `make similar`), and `pytest-xdist` / `pytest-timeout` /
+  `pytest-recording` in dev deps.
+
+### Changed
+- **Markdown → storage converter replaced with `markdown-it-py`** (+ GFM
+  plugins for tables, strikethrough, task lists). Fixes loss of `**bold**`,
+  `*italic*`, bullet and numbered lists, setext headers, horizontal rules,
+  inline code, links, and blockquotes in the prior hand-rolled translator.
+  Existing hooks preserved: `<details>` → expand macro, raw storage-format
+  passthrough (`<ac:…>`, `<ri:…>`, any HTML block), `@user:ACCOUNT_ID`
+  mention shorthand, fenced code → `ac:code` macro.
+
+### Docs
+- Server `instructions` hoist the `connection` parameter clarifier:
+  it's the saved a2atlassian connection name (e.g. `"protea"`), NOT a
+  Jira project key or Confluence space key. Reinforced in the two newest
+  tool docstrings.
+- `docs/signals-from-protea-2026-04-23.md` — pre-triaged signal bundle
+  from Protea reflections, with per-item status (fixed / open / upstream).
+
 ### Fixed
 - **Every MCP tool response crashed client-side** with `pydantic_core.ValidationError: Input should be a valid dictionary or object to extract fields from`. Tool functions declared `-> OperationResult`, but the `@mcp_tool` wrapper actually returns a formatted JSON/TOON string; MCP ≥1.9's output-schema validation then validated the string against the dataclass schema. The decorator now overrides the annotation to `str` on both the wrapper and its `__wrapped__` target so FastMCP builds a matching output schema. Confluence reads were fully blocked by this.
 - **`confluence_upsert_pages` silently no-op'd `page_width` / `emoji` on existing pages.** Both knobs went through `Confluence.set_page_property`, which is POST-only and errors (swallowed by the batch handler) when the property already exists. Now resolves through get → `update_page_property` with incremented version, falling back to `set_page_property` on first write.

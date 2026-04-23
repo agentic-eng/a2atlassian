@@ -18,8 +18,10 @@ server = FastMCP(
     "a2atlassian",
     instructions=(
         "Agent-to-Atlassian — works with both Jira and Confluence. "
-        "Connections are identified by a connection name. "
-        "Use 'login' to save a connection, then call tools with the connection name. "
+        "Tools take a `connection` parameter — this is the saved a2atlassian "
+        "connection name (e.g. 'protea'), NOT a Jira project key or Confluence "
+        "space key. Use `list_connections` to see saved names. "
+        "Use 'login' to save a new connection, then call tools with the connection name. "
         "Connections are read-only by default; re-login with --read-only false to enable writes. "
         "For security, pass tokens as ${ENV_VAR} references, not literal values. "
         "Default output is TOON for lists (token-efficient), JSON for single entities."
