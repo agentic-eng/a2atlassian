@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from a2atlassian.client import AtlassianClient
-from a2atlassian.formatter import format_result
+from a2atlassian.decorators import mcp_tool
+from a2atlassian.formatter import OperationResult  # noqa: TC001 — FastMCP needs runtime annotation
 from a2atlassian.jira.projects import create_version, get_project_components, get_project_versions, get_projects
 
 if TYPE_CHECKING:
@@ -23,34 +24,42 @@ def register_read(
     enricher: ErrorEnricher,
 ) -> None:
     @server.tool()
-    async def jira_get_projects(connection: str, format: str = "toon") -> str:  # noqa: A002
-        """List all Jira projects."""
-        client = get_client(connection)
-        try:
-            result = await get_projects(client)
-        except Exception as exc:  # noqa: BLE001
-            return enricher.enrich(str(exc), {"connection": connection})
-        return format_result(result, fmt=format)
+    @mcp_tool(enricher)
+    async def jira_get_projects(
+        connection: str,
+        format: Literal["toon", "json"] = "toon",  # noqa: A002
+    ) -> OperationResult:
+        """List all Jira projects.
+
+        Returns TOON by default (compact); pass format='json' for standard JSON shape.
+        """
+        return await get_projects(get_client(connection))
 
     @server.tool()
-    async def jira_get_project_versions(connection: str, project_key: str, format: str = "toon") -> str:  # noqa: A002
-        """Get versions for a Jira project."""
-        client = get_client(connection)
-        try:
-            result = await get_project_versions(client, project_key)
-        except Exception as exc:  # noqa: BLE001
-            return enricher.enrich(str(exc), {"connection": connection})
-        return format_result(result, fmt=format)
+    @mcp_tool(enricher)
+    async def jira_get_project_versions(
+        connection: str,
+        project_key: str,
+        format: Literal["toon", "json"] = "toon",  # noqa: A002
+    ) -> OperationResult:
+        """Get versions for a Jira project.
+
+        Returns TOON by default (compact); pass format='json' for standard JSON shape.
+        """
+        return await get_project_versions(get_client(connection), project_key)
 
     @server.tool()
-    async def jira_get_project_components(connection: str, project_key: str, format: str = "toon") -> str:  # noqa: A002
-        """Get components for a Jira project."""
-        client = get_client(connection)
-        try:
-            result = await get_project_components(client, project_key)
-        except Exception as exc:  # noqa: BLE001
-            return enricher.enrich(str(exc), {"connection": connection})
-        return format_result(result, fmt=format)
+    @mcp_tool(enricher)
+    async def jira_get_project_components(
+        connection: str,
+        project_key: str,
+        format: Literal["toon", "json"] = "toon",  # noqa: A002
+    ) -> OperationResult:
+        """Get components for a Jira project.
+
+        Returns TOON by default (compact); pass format='json' for standard JSON shape.
+        """
+        return await get_project_components(get_client(connection), project_key)
 
 
 def register_write(
@@ -59,14 +68,15 @@ def register_write(
     enricher: ErrorEnricher,
 ) -> None:
     @server.tool()
-    async def jira_create_version(connection: str, project_key: str, name: str, format: str = "json") -> str:  # noqa: A002
+    @mcp_tool(enricher)
+    async def jira_create_version(
+        connection: str,
+        project_key: str,
+        name: str,
+        format: Literal["toon", "json"] = "json",  # noqa: A002
+    ) -> OperationResult:
         """Create a new version in a Jira project."""
         conn = get_connection(connection)
         if conn.read_only:
-            return enricher.enrich(f"Connection '{connection}' is read-only.", {"connection": connection})
-        client = AtlassianClient(conn)
-        try:
-            result = await create_version(client, project_key=project_key, name=name)
-        except Exception as exc:  # noqa: BLE001
-            return enricher.enrich(str(exc), {"connection": connection})
-        return format_result(result, fmt=format)
+            raise RuntimeError(f"Connection '{connection}' is read-only. Run: a2atlassian login -c {connection} --no-read-only")
+        return await create_version(AtlassianClient(conn), project_key=project_key, name=name)
