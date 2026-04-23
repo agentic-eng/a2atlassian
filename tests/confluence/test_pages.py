@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import json
+import json as _json
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 
-from a2atlassian.confluence.pages import get_page, get_page_children, resolve_page_identity
+from a2atlassian.confluence.pages import get_page, get_page_children, resolve_page_identity, upsert_page
 from a2atlassian.confluence_client import ConfluenceClient
 from a2atlassian.connections import ConnectionInfo
 from a2atlassian.formatter import OperationResult
@@ -115,3 +116,69 @@ class TestResolveIdentity:
         mock_client._confluence_instance.get_page_by_title.return_value = None
         resolved = await resolve_page_identity(mock_client, space="SP", title="Nope", page_id=None, parent_id=None)
         assert resolved is None
+
+
+class TestUpsertSingle:
+    async def test_create_when_no_existing(self, mock_client: ConfluenceClient) -> None:
+        mock_client._confluence_instance.get_page_by_title.return_value = None
+        mock_client._confluence_instance.create_page.return_value = _json.loads(
+            (FIXTURES / "confluence_create_page_response.json").read_text()
+        )
+        result = await upsert_page(
+            mock_client,
+            space="SP",
+            title="New",
+            content="# hi",
+            parent_id=None,
+            page_id=None,
+            content_format="markdown",
+            page_width=None,
+            emoji=None,
+            labels=None,
+        )
+        assert result["status"] == "created"
+        assert result["page_id"] == "900"
+        assert result["version"] == 1
+        call = mock_client._confluence_instance.create_page.call_args
+        assert call.kwargs.get("representation") == "storage"
+        assert "<h1>hi</h1>" in call.kwargs.get("body", "")
+
+    async def test_update_when_match(self, mock_client: ConfluenceClient) -> None:
+        mock_client._confluence_instance.get_page_by_title.return_value = {"id": "900", "title": "New"}
+        mock_client._confluence_instance.update_page.return_value = _json.loads(
+            (FIXTURES / "confluence_update_page_response.json").read_text()
+        )
+        result = await upsert_page(
+            mock_client,
+            space="SP",
+            title="New",
+            content="body",
+            parent_id=None,
+            page_id=None,
+            content_format="markdown",
+            page_width=None,
+            emoji=None,
+            labels=None,
+        )
+        assert result["status"] == "updated"
+        assert result["page_id"] == "900"
+        assert result["version"] == 4
+
+    async def test_storage_bypasses_translator(self, mock_client: ConfluenceClient) -> None:
+        mock_client._confluence_instance.get_page_by_title.return_value = None
+        mock_client._confluence_instance.create_page.return_value = {"id": "1", "version": {"number": 1}, "_links": {"webui": "/p/1"}}
+        raw = '<ac:structured-macro ac:name="info"><ac:rich-text-body><p>x</p></ac:rich-text-body></ac:structured-macro>'
+        await upsert_page(
+            mock_client,
+            space="SP",
+            title="T",
+            content=raw,
+            parent_id=None,
+            page_id=None,
+            content_format="storage",
+            page_width=None,
+            emoji=None,
+            labels=None,
+        )
+        call = mock_client._confluence_instance.create_page.call_args
+        assert call.kwargs.get("body") == raw  # passed through unchanged

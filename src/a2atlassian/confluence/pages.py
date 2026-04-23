@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Any
 
+from a2atlassian.confluence.content_format import markdown_to_storage
 from a2atlassian.formatter import OperationResult
 
 if TYPE_CHECKING:
@@ -128,3 +129,58 @@ async def resolve_page_identity(
     if top:
         return str(top.get("id"))
     return None
+
+
+async def upsert_page(
+    client: ConfluenceClient,
+    *,
+    space: str,
+    title: str,
+    content: str,
+    parent_id: str | None,
+    page_id: str | None,
+    content_format: str,
+    page_width: str | None,
+    emoji: str | None,
+    labels: list[str] | None,
+) -> dict[str, Any]:
+    """Create or update a single Confluence page. Returns a succeeded-shaped dict.
+
+    Caller (batch upsert) wraps exceptions; this function may raise.
+    """
+    body = content if content_format == "storage" else markdown_to_storage(content)
+    resolved = await resolve_page_identity(client, space=space, title=title, page_id=page_id, parent_id=parent_id)
+
+    if resolved is None:
+        raw = await client._call(
+            client._confluence.create_page,
+            space=space,
+            title=title,
+            body=body,
+            parent_id=parent_id,
+            type="page",
+            representation="storage",
+        )
+        status = "created"
+    else:
+        raw = await client._call(
+            client._confluence.update_page,
+            page_id=resolved,
+            title=title,
+            body=body,
+            parent_id=parent_id,
+            representation="storage",
+        )
+        status = "updated"
+
+    links = raw.get("_links") or {}
+    version = (raw.get("version") or {}).get("number", 0)
+    page_id_out = str(raw.get("id", resolved or ""))
+
+    return {
+        "title": title,
+        "page_id": page_id_out,
+        "status": status,
+        "url": links.get("webui", ""),
+        "version": version,
+    }
