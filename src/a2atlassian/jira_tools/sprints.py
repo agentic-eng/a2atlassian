@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal
 
 from a2atlassian.client import AtlassianClient
-from a2atlassian.decorators import mcp_tool
+from a2atlassian.decorators import check_writable, mcp_tool
 from a2atlassian.formatter import OperationResult  # noqa: TC001 — FastMCP needs runtime annotation
 from a2atlassian.jira.sprints import add_issues_to_sprint, create_sprint, get_sprint_issues, get_sprints, update_sprint
 
@@ -69,8 +69,7 @@ def register_write(
     ) -> OperationResult:
         """Create a new sprint on a Jira board."""
         conn = get_connection(connection)
-        if conn.read_only:
-            raise RuntimeError(f"Connection '{connection}' is read-only. Run: a2atlassian login -c {connection} --no-read-only")
+        check_writable(conn, connection)
         return await create_sprint(AtlassianClient(conn), name, board_id, start_date=start_date, end_date=end_date)
 
     @server.tool()
@@ -86,8 +85,7 @@ def register_write(
     ) -> OperationResult:
         """Update an existing sprint (name, state, dates)."""
         conn = get_connection(connection)
-        if conn.read_only:
-            raise RuntimeError(f"Connection '{connection}' is read-only. Run: a2atlassian login -c {connection} --no-read-only")
+        check_writable(conn, connection)
         kwargs = {k: v for k, v in {"name": name, "state": state, "start_date": start_date, "end_date": end_date}.items() if v is not None}
         return await update_sprint(AtlassianClient(conn), sprint_id, **kwargs)
 
@@ -101,6 +99,5 @@ def register_write(
     ) -> OperationResult:
         """Move issues into a sprint."""
         conn = get_connection(connection)
-        if conn.read_only:
-            raise RuntimeError(f"Connection '{connection}' is read-only. Run: a2atlassian login -c {connection} --no-read-only")
+        check_writable(conn, connection)
         return await add_issues_to_sprint(AtlassianClient(conn), sprint_id, issue_keys)

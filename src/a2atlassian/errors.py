@@ -66,8 +66,8 @@ class ErrorEnricher:
             )
 
         if "read-only" in error_msg.lower() or "read_only" in error_msg.lower():
-            project = context.get("project", "<project>")
-            parts.append(f"Run: a2atlassian login -p {project} --read-only false")
+            connection = context.get("connection", "<connection>")
+            parts.append(f"Run: a2atlassian login -c {connection} --no-read-only")
 
         return "\n".join(parts)
 

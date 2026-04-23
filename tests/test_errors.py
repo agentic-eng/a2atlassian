@@ -22,8 +22,8 @@ class TestErrorEnricher:
         assert "Jira UI" in result
 
     def test_read_only_hint(self) -> None:
-        result = self.enricher.enrich("Connection is read-only", {"project": "myproject"})
-        assert "a2atlassian login -p myproject --read-only false" in result
+        result = self.enricher.enrich("Connection is read-only", {"connection": "myproject"})
+        assert "a2atlassian login -c myproject --no-read-only" in result
 
     def test_field_suggestion_with_available(self) -> None:
         ctx = {"available_fields": ["Story Points", "Sprint", "Epic Link"]}

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Literal
 from zoneinfo import ZoneInfo
 
 from a2atlassian.client import AtlassianClient
-from a2atlassian.decorators import mcp_tool
+from a2atlassian.decorators import check_writable, mcp_tool
 from a2atlassian.formatter import OperationResult
 from a2atlassian.jira.worklogs import (
     _parse_started,
@@ -131,6 +131,5 @@ def register_write(
     ) -> OperationResult:
         """Add a worklog entry to a Jira issue. time_spent is a string like '2h 30m'."""
         conn = get_connection(connection)
-        if conn.read_only:
-            raise RuntimeError(f"Connection '{connection}' is read-only. Run: a2atlassian login -c {connection} --no-read-only")
+        check_writable(conn, connection)
         return await add_worklog(AtlassianClient(conn), issue_key, time_spent, comment=comment)

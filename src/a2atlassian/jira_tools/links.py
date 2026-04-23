@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal
 
 from a2atlassian.client import AtlassianClient
-from a2atlassian.decorators import mcp_tool
+from a2atlassian.decorators import check_writable, mcp_tool
 from a2atlassian.formatter import OperationResult  # noqa: TC001 — FastMCP needs runtime annotation
 from a2atlassian.jira.links import create_issue_link, get_link_types, remove_issue_link
 
@@ -55,8 +55,7 @@ def register_write(
         To set an issue's parent (Epic), pass link_type='Epic' with inward_key=<child> and outward_key=<epic>.
         """
         conn = get_connection(connection)
-        if conn.read_only:
-            raise RuntimeError(f"Connection '{connection}' is read-only. Run: a2atlassian login -c {connection} --no-read-only")
+        check_writable(conn, connection)
         return await create_issue_link(AtlassianClient(conn), link_type, inward_key, outward_key)
 
     @server.tool()
@@ -68,6 +67,5 @@ def register_write(
     ) -> OperationResult:
         """Remove an issue link by its ID."""
         conn = get_connection(connection)
-        if conn.read_only:
-            raise RuntimeError(f"Connection '{connection}' is read-only. Run: a2atlassian login -c {connection} --no-read-only")
+        check_writable(conn, connection)
         return await remove_issue_link(AtlassianClient(conn), link_id)

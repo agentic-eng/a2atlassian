@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal
 
 from a2atlassian.client import AtlassianClient
-from a2atlassian.decorators import mcp_tool
+from a2atlassian.decorators import check_writable, mcp_tool
 from a2atlassian.formatter import OperationResult  # noqa: TC001 — FastMCP needs runtime annotation
 from a2atlassian.jira.issues import create_issue, delete_issue, get_issue, search, search_count, update_issue
 
@@ -76,8 +76,7 @@ def register_write(
     ) -> OperationResult:
         """Create a new Jira issue. Accepts project_key, summary, issue_type, optional description and extra_fields dict."""
         conn = get_connection(connection)
-        if conn.read_only:
-            raise RuntimeError(f"Connection '{connection}' is read-only. Run: a2atlassian login -c {connection} --no-read-only")
+        check_writable(conn, connection)
         return await create_issue(
             AtlassianClient(conn),
             project_key,
@@ -97,8 +96,7 @@ def register_write(
     ) -> OperationResult:
         """Update fields on an existing Jira issue. Pass a dict of field names to values."""
         conn = get_connection(connection)
-        if conn.read_only:
-            raise RuntimeError(f"Connection '{connection}' is read-only. Run: a2atlassian login -c {connection} --no-read-only")
+        check_writable(conn, connection)
         return await update_issue(AtlassianClient(conn), issue_key, fields)
 
     @server.tool()
@@ -110,6 +108,5 @@ def register_write(
     ) -> OperationResult:
         """Delete a Jira issue by key."""
         conn = get_connection(connection)
-        if conn.read_only:
-            raise RuntimeError(f"Connection '{connection}' is read-only. Run: a2atlassian login -c {connection} --no-read-only")
+        check_writable(conn, connection)
         return await delete_issue(AtlassianClient(conn), issue_key)

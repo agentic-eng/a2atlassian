@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal
 
 from a2atlassian.client import AtlassianClient
-from a2atlassian.decorators import mcp_tool
+from a2atlassian.decorators import check_writable, mcp_tool
 from a2atlassian.formatter import OperationResult  # noqa: TC001 — FastMCP needs runtime annotation
 from a2atlassian.jira.comments import add_comment, edit_comment, get_comments
 
@@ -52,8 +52,7 @@ def register_write(
     ) -> OperationResult:
         """Add a comment to a Jira issue. Uses wiki markup (API v2)."""
         conn = get_connection(connection)
-        if conn.read_only:
-            raise RuntimeError(f"Connection '{connection}' is read-only. Run: a2atlassian login -c {connection} --no-read-only")
+        check_writable(conn, connection)
         return await add_comment(AtlassianClient(conn), issue_key, body)
 
     @server.tool()
@@ -67,6 +66,5 @@ def register_write(
     ) -> OperationResult:
         """Edit an existing comment on a Jira issue. Uses wiki markup (API v2)."""
         conn = get_connection(connection)
-        if conn.read_only:
-            raise RuntimeError(f"Connection '{connection}' is read-only. Run: a2atlassian login -c {connection} --no-read-only")
+        check_writable(conn, connection)
         return await edit_comment(AtlassianClient(conn), issue_key, comment_id, body)

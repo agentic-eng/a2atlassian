@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Literal
 
 from a2atlassian.client import AtlassianClient
-from a2atlassian.decorators import mcp_tool
+from a2atlassian.decorators import check_writable, mcp_tool
 from a2atlassian.formatter import OperationResult  # noqa: TC001 — FastMCP needs runtime annotation
 from a2atlassian.jira.transitions import get_transitions, transition_issue
 
@@ -52,6 +52,5 @@ def register_write(
     ) -> OperationResult:
         """Transition a Jira issue to a new status. Use jira_get_transitions to discover available transitions."""
         conn = get_connection(connection)
-        if conn.read_only:
-            raise RuntimeError(f"Connection '{connection}' is read-only. Run: a2atlassian login -c {connection} --no-read-only")
+        check_writable(conn, connection)
         return await transition_issue(AtlassianClient(conn), issue_key, transition_id)
