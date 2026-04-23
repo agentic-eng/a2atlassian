@@ -9,7 +9,7 @@ import pytest
 from a2atlassian.client import AtlassianClient
 from a2atlassian.connections import ConnectionInfo
 from a2atlassian.formatter import OperationResult
-from a2atlassian.jira.watchers import add_watcher, get_watchers, remove_watcher
+from a2atlassian.jira.watchers import get_watchers, set_watchers
 
 
 @pytest.fixture
@@ -61,23 +61,20 @@ class TestGetWatchers:
         assert result.data == []
 
 
-class TestAddWatcher:
-    async def test_adds_watcher(self, mock_client: AtlassianClient) -> None:
-        mock_client._jira_instance.issue_add_watcher.return_value = None
-        result = await add_watcher(mock_client, "PROJ-1", "abc123")
-        assert isinstance(result, OperationResult)
-        assert result.data["issue_key"] == "PROJ-1"
-        assert result.data["account_id"] == "abc123"
-        assert result.data["status"] == "added"
-        mock_client._jira_instance.issue_add_watcher.assert_called_once_with("PROJ-1", "abc123")
+class TestSetWatchers:
+    async def test_adds_and_removes(self, mock_client: AtlassianClient) -> None:
+        await set_watchers(mock_client, "PROJ-1", add=["a1", "a2"], remove=["r1"])
+        calls = mock_client._jira_instance.mock_calls
+        # Expect issue_add_watcher called for 'a1', 'a2'
+        # Expect issue_delete_watcher called for 'r1'
+        added = [c for c in calls if c[0] == "issue_add_watcher"]
+        removed = [c for c in calls if c[0] == "issue_delete_watcher"]
+        assert len(added) == 2
+        assert len(removed) == 1
 
-
-class TestRemoveWatcher:
-    async def test_removes_watcher(self, mock_client: AtlassianClient) -> None:
-        mock_client._jira_instance.issue_remove_watcher.return_value = None
-        result = await remove_watcher(mock_client, "PROJ-1", "abc123")
-        assert isinstance(result, OperationResult)
-        assert result.data["issue_key"] == "PROJ-1"
-        assert result.data["account_id"] == "abc123"
-        assert result.data["status"] == "removed"
-        mock_client._jira_instance.issue_remove_watcher.assert_called_once_with("PROJ-1", "abc123")
+    async def test_empty_lists_no_calls(self, mock_client: AtlassianClient) -> None:
+        await set_watchers(mock_client, "PROJ-1", add=[], remove=[])
+        # No watcher-mutation calls made
+        names = [c[0] for c in mock_client._jira_instance.mock_calls]
+        assert "issue_add_watcher" not in names
+        assert "issue_delete_watcher" not in names

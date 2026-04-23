@@ -259,7 +259,7 @@ class TestToolWrapperExecution:
     async def test_all_write_tools_execute(self) -> None:
         """Every write tool wrapper body executes (writable connection)."""
         srv, _, write_names = self._register_and_split(read_only=False)
-        assert len(write_names) == 16
+        assert len(write_names) == 15
         for name in write_names:
             tool = srv._tool_manager._tools[name]
             kwargs = self._build_kwargs(tool.fn)

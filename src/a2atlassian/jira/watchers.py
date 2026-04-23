@@ -1,4 +1,4 @@
-"""Jira watcher operations — get, add, remove watchers."""
+"""Jira watcher operations — get and set watchers."""
 
 from __future__ import annotations
 
@@ -42,46 +42,22 @@ async def get_watchers(client: AtlassianClient, issue_key: str) -> OperationResu
     )
 
 
-async def add_watcher(
+async def set_watchers(
     client: AtlassianClient,
     issue_key: str,
-    account_id: str,
+    add: list[str] | None = None,
+    remove: list[str] | None = None,
 ) -> OperationResult:
-    """Add a watcher to a Jira issue."""
+    """Add and/or remove watchers on a Jira issue. Lists of account IDs."""
     t0 = time.monotonic()
-    await client._call(client._jira.issue_add_watcher, issue_key, account_id)
+    for account_id in add or []:
+        await client._call(client._jira.issue_add_watcher, issue_key, account_id)
+    for account_id in remove or []:
+        await client._call(client._jira.issue_delete_watcher, issue_key, account_id)
     elapsed = int((time.monotonic() - t0) * 1000)
-
     return OperationResult(
-        name="add_watcher",
-        data={
-            "issue_key": issue_key,
-            "account_id": account_id,
-            "status": "added",
-        },
-        count=1,
-        truncated=False,
-        time_ms=elapsed,
-    )
-
-
-async def remove_watcher(
-    client: AtlassianClient,
-    issue_key: str,
-    account_id: str,
-) -> OperationResult:
-    """Remove a watcher from a Jira issue."""
-    t0 = time.monotonic()
-    await client._call(client._jira.issue_remove_watcher, issue_key, account_id)
-    elapsed = int((time.monotonic() - t0) * 1000)
-
-    return OperationResult(
-        name="remove_watcher",
-        data={
-            "issue_key": issue_key,
-            "account_id": account_id,
-            "status": "removed",
-        },
+        name="set_watchers",
+        data={"issue_key": issue_key, "added": list(add or []), "removed": list(remove or []), "status": "ok"},
         count=1,
         truncated=False,
         time_ms=elapsed,
