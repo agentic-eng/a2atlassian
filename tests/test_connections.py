@@ -127,3 +127,31 @@ class TestConnectionStore:
         store.save("proj", "https://x.atlassian.net", "a@b.com", token)
         loaded = store.load("proj")
         assert loaded.token == token
+
+
+class TestTimezone:
+    def test_default_is_utc(self, tmp_path) -> None:
+        store = ConnectionStore(tmp_path)
+        store.save("c", "https://x.atlassian.net", "x@y.com", "t")
+        info = store.load("c")
+        assert info.timezone == "UTC"
+
+    def test_save_and_load_roundtrip(self, tmp_path) -> None:
+        store = ConnectionStore(tmp_path)
+        store.save("c", "https://x.atlassian.net", "x@y.com", "t", timezone="Europe/Istanbul")
+        info = store.load("c")
+        assert info.timezone == "Europe/Istanbul"
+
+
+class TestWorklogAdmins:
+    def test_default_is_empty(self, tmp_path) -> None:
+        store = ConnectionStore(tmp_path)
+        store.save("c", "https://x.atlassian.net", "x@y.com", "t")
+        info = store.load("c")
+        assert info.worklog_admins == ()
+
+    def test_save_and_load_roundtrip(self, tmp_path) -> None:
+        store = ConnectionStore(tmp_path)
+        store.save("c", "https://x.atlassian.net", "x@y.com", "t", worklog_admins=["a@x.com", "b@x.com"])
+        info = store.load("c")
+        assert info.worklog_admins == ("a@x.com", "b@x.com")

@@ -22,6 +22,8 @@ class ConnectionInfo:
     email: str
     token: str
     read_only: bool = True
+    timezone: str = "UTC"
+    worklog_admins: tuple[str, ...] = ()
 
     @property
     def resolved_token(self) -> str:
@@ -38,7 +40,16 @@ class ConnectionStore:
     def _path(self, connection: str) -> Path:
         return self.config_dir / f"{connection}.toml"
 
-    def save(self, connection: str, url: str, email: str, token: str, read_only: bool = True) -> Path:
+    def save(
+        self,
+        connection: str,
+        url: str,
+        email: str,
+        token: str,
+        read_only: bool = True,
+        timezone: str = "UTC",
+        worklog_admins: list[str] | tuple[str, ...] = (),
+    ) -> Path:
         """Save a connection. Creates or overwrites the TOML file. Returns the path."""
         self.config_dir.mkdir(parents=True, exist_ok=True)
         path = self._path(connection)
@@ -47,12 +58,15 @@ class ConnectionStore:
             return value.replace("\\", "\\\\").replace('"', '\\"')
 
         ro = "true" if read_only else "false"
+        admins = ", ".join(f'"{_escape(a)}"' for a in worklog_admins)
         content = (
             f'project = "{_escape(connection)}"\n'
             f'url = "{_escape(url)}"\n'
             f'email = "{_escape(email)}"\n'
             f'token = "{_escape(token)}"\n'
             f"read_only = {ro}\n"
+            f'timezone = "{_escape(timezone)}"\n'
+            f"worklog_admins = [{admins}]\n"
         )
         path.write_text(content)
         path.chmod(stat.S_IRUSR | stat.S_IWUSR)  # 0600
@@ -71,6 +85,8 @@ class ConnectionStore:
             email=data["email"],
             token=data["token"],
             read_only=data.get("read_only", True),
+            timezone=data.get("timezone", "UTC"),
+            worklog_admins=tuple(data.get("worklog_admins", ())),
         )
 
     def delete(self, connection: str) -> None:
@@ -94,6 +110,8 @@ class ConnectionStore:
                 email=data["email"],
                 token=data["token"],
                 read_only=data.get("read_only", True),
+                timezone=data.get("timezone", "UTC"),
+                worklog_admins=tuple(data.get("worklog_admins", ())),
             )
             if connection is None or info.connection == connection:
                 results.append(info)
