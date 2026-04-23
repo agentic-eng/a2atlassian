@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from a2atlassian.confluence.pages import get_page, get_page_children
+from a2atlassian.confluence.pages import get_page, get_page_children, resolve_page_identity
 from a2atlassian.confluence_client import ConfluenceClient
 from a2atlassian.connections import ConnectionInfo
 from a2atlassian.formatter import OperationResult
@@ -78,3 +78,40 @@ class TestGetPageChildren:
         assert call.kwargs.get("start") == 20
         assert call.kwargs.get("limit") == 10
         assert call.kwargs.get("type") == "page"
+
+
+class TestResolveIdentity:
+    async def test_page_id_wins(self, mock_client: ConfluenceClient) -> None:
+        mock_client._confluence_instance.get_page_by_id.return_value = {"id": "42", "title": "X"}
+        resolved = await resolve_page_identity(mock_client, space="SP", title="ignored", page_id="42", parent_id=None)
+        assert resolved == "42"
+
+    async def test_page_id_missing_raises(self, mock_client: ConfluenceClient) -> None:
+        mock_client._confluence_instance.get_page_by_id.return_value = None
+        with pytest.raises(ValueError, match="page_id"):
+            await resolve_page_identity(mock_client, space="SP", title="ignored", page_id="999", parent_id=None)
+
+    async def test_parent_scoped_match(self, mock_client: ConfluenceClient) -> None:
+        mock_client._confluence_instance.get_page_child_by_type.return_value = [
+            {"id": "100", "title": "Report"},
+            {"id": "101", "title": "Other"},
+        ]
+        resolved = await resolve_page_identity(mock_client, space="SP", title="Report", page_id=None, parent_id="50")
+        assert resolved == "100"
+        call = mock_client._confluence_instance.get_page_child_by_type.call_args
+        assert call.args[0] == "50"
+
+    async def test_parent_scoped_no_match_returns_none(self, mock_client: ConfluenceClient) -> None:
+        mock_client._confluence_instance.get_page_child_by_type.return_value = [{"id": "100", "title": "X"}]
+        resolved = await resolve_page_identity(mock_client, space="SP", title="Missing", page_id=None, parent_id="50")
+        assert resolved is None
+
+    async def test_space_root_match(self, mock_client: ConfluenceClient) -> None:
+        mock_client._confluence_instance.get_page_by_title.return_value = {"id": "200", "title": "Top"}
+        resolved = await resolve_page_identity(mock_client, space="SP", title="Top", page_id=None, parent_id=None)
+        assert resolved == "200"
+
+    async def test_space_root_no_match_returns_none(self, mock_client: ConfluenceClient) -> None:
+        mock_client._confluence_instance.get_page_by_title.return_value = None
+        resolved = await resolve_page_identity(mock_client, space="SP", title="Nope", page_id=None, parent_id=None)
+        assert resolved is None

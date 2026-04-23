@@ -91,3 +91,40 @@ async def get_page_children(
         truncated=len(items) >= limit,
         time_ms=elapsed,
     )
+
+
+async def resolve_page_identity(
+    client: ConfluenceClient,
+    space: str,
+    title: str,
+    page_id: str | None,
+    parent_id: str | None,
+) -> str | None:
+    """Resolve a page id for upsert. Returns the id if an existing page matches, None if not.
+
+    Precedence:
+      1. page_id given → must exist; raise if missing.
+      2. parent_id given → search that parent's children for a title match (this parent only).
+      3. Otherwise → search the space root by title.
+
+    Per-parent scope is deliberate: same title under a different parent counts as a miss.
+    """
+    if page_id:
+        existing = await client._call(client._confluence.get_page_by_id, page_id)
+        if not existing:
+            msg = f"page_id {page_id} not found"
+            raise ValueError(msg)
+        return page_id
+
+    if parent_id:
+        children = await client._call(client._confluence.get_page_child_by_type, parent_id, type="page", start=0, limit=200)
+        items = children if isinstance(children, list) else (children or {}).get("results", [])
+        for child in items:
+            if child.get("title") == title:
+                return str(child.get("id"))
+        return None
+
+    top = await client._call(client._confluence.get_page_by_title, space=space, title=title)
+    if top:
+        return str(top.get("id"))
+    return None
